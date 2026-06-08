@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Cup 2026 Sweepstake</title>
+<style>
+  :root{
+    --bg:#0a1f14; --panel:#0f2a1c; --panel2:#13351f; --line:#1f4a30;
+    --text:#eaf3ec; --muted:#9bbfa6; --accent:#19c37d; --gold:#f5c542;
+    --red:#e5534b; --blue:#4aa3ff; --chip:#16402a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(160deg,#08160e,#0a1f14 40%,#0c2418);color:var(--text);min-height:100vh;}
+  a{color:var(--accent)}
+  header{padding:22px 18px 10px;text-align:center}
+  h1{margin:0;font-size:24px;letter-spacing:.3px}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .wrap{max-width:1080px;margin:0 auto;padding:12px 14px 60px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:14px 0;
+    box-shadow:0 4px 18px rgba(0,0,0,.25)}
+  .panel h2{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:8px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  input,button,select{font:inherit}
+  input[type=text],input[type=number],input[type=password]{background:#0a2014;border:1px solid var(--line);
+    color:var(--text);border-radius:8px;padding:8px 10px;outline:none}
+  input:focus{border-color:var(--accent)}
+  button{background:var(--accent);color:#04150c;border:none;border-radius:9px;padding:9px 16px;font-weight:600;cursor:pointer}
+  button.secondary{background:transparent;border:1px solid var(--line);color:var(--text)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .muted{color:var(--muted)}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+  .tab{padding:8px 14px;border-radius:999px;background:var(--chip);border:1px solid var(--line);cursor:pointer;font-size:13px;color:var(--muted)}
+  .tab.active{background:var(--accent);color:#04150c;border-color:var(--accent);font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  td.num,th.num{text-align:center}
+  tr.leader td{background:rgba(245,197,66,.08)}
+  .rank{font-weight:700;width:28px;text-align:center}
+  .ptsbig{font-weight:800;font-size:16px;color:var(--gold)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+  .pill.alive{background:rgba(25,195,125,.15);color:var(--accent)}
+  .pill.out{background:rgba(229,83,75,.15);color:var(--red)}
+  .pill.win{background:rgba(25,195,125,.15);color:var(--accent)}
+  .pill.draw{background:rgba(245,197,66,.15);color:var(--gold)}
+  .pill.loss{background:rgba(229,83,75,.15);color:var(--red)}
+  .teamcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;background:var(--panel2)}
+  .teamcard .name{font-weight:600}
+  .teamline{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px;border-top:1px dashed var(--line)}
+  .teamline:first-of-type{border-top:none}
+  .fx{display:flex;justify-content:space-between;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);font-size:14px}
+  .fx .score{font-weight:700;min-width:54px;text-align:center}
+  .fx .when{color:var(--muted);font-size:12px;min-width:96px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  .hidden{display:none}
+  .status{font-size:13px;color:var(--muted);margin-top:8px;min-height:18px}
+  .err{color:var(--red)}
+  .ok{color:var(--accent)}
+  .pred input{width:74px}
+  .pred td{font-size:13px}
+  .legend{font-size:12px;color:var(--muted);margin-top:8px}
+  .small{font-size:12px}
+  details{margin-top:8px}
+  summary{cursor:pointer;color:var(--muted);font-size:13px}
+  .owner-chip{font-size:11px;color:var(--muted)}
+  .flagdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--accent)}
+  .flagdot.out{background:var(--red)}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ World Cup 2026 Sweepstake</h1>
+  <div class="sub">USA · Canada · Mexico — 5 players, 9 teams each · live results from API-Football</div>
+</header>
+
+<div class="wrap">
+
+  <!-- SETUP -->
+  <div class="panel" id="setupPanel">
+    <h2>🔑 Setup</h2>
+    <div class="row">
+      <input type="password" id="apiKey" placeholder="Paste your api-sports.io API key" style="flex:1;min-width:220px">
+      <button onclick="saveKey()">Save key</button>
+      <button class="secondary" onclick="clearKey()">Clear</button>
+    </div>
+    <div class="legend">Your key is stored only in this browser (localStorage) and is sent straight to api-sports.io — it is never hard-coded into this file or shared. Get a key at <span class="ok">dashboard.api-football.com</span>.</div>
+    <div class="row" style="margin-top:12px">
+      <label class="small muted">Points per win <input type="number" id="winPts" value="3" min="0" style="width:60px"></label>
+      <label class="small muted">Points per draw <input type="number" id="drawPts" value="1" min="0" style="width:60px"></label>
+      <label class="small muted">Season <input type="number" id="season" value="2026" style="width:80px"></label>
+      <label class="small muted">League ID <input type="number" id="leagueId" value="1" style="width:60px"></label>
+      <button onclick="loadData(true)">↻ Refresh results</button>
+    </div>
+    <div class="status" id="status">Enter your API key and hit “Refresh results”. (The tournament data will populate as matches kick off.)</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab active" data-tab="leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</div>
+    <div class="tab" data-tab="teams" onclick="showTab('teams')">👥 Players &amp; teams</div>
+    <div class="tab" data-tab="fixtures" onclick="showTab('fixtures')">📅 Results &amp; fixtures</div>
+    <div class="tab" data-tab="tiebreak" onclick="showTab('tiebreak')">🎯 Tiebreakers</div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="panel tabpanel" id="tab-leaderboard">
+    <h2>🏆 Leaderboard</h2>
+    <table id="lbTable">
+      <thead><tr>
+        <th class="rank">#</th><th>Player</th><th class="num">Pts</th>
+        <th class="num">P</th><th class="num">W</th><th class="num">D</th><th class="num">L</th>
+        <th class="num">GF</th><th class="num">Alive</th>
+      </tr></thead>
+      <tbody id="lbBody"><tr><td colspan="9" class="muted">No data yet — refresh results.</td></tr></tbody>
+    </table>
+    <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. Matches decided on penalties count as draws (level on goals). “Alive” = teams not yet knocked out.</div>
+  </div>
+
+  <!-- TEAMS -->
+  <div class="panel tabpanel hidden" id="tab-teams">
+    <h2>👥 Players &amp; teams</h2>
+    <div class="grid2" id="teamsGrid"></div>
+  </div>
+
+  <!-- FIXTURES -->
+  <div class="panel tabpanel hidden" id="tab-fixtures">
+    <h2>📅 Results &amp; fixtures</h2>
+    <div class="row" style="margin-bottom:8px">
+      <div class="tab active" id="fxRecent" onclick="renderFixtures('recent')">Recent results</div>
+      <div class="tab" id="fxUpcoming" onclick="renderFixtures('upcoming')">Upcoming</div>
+    </div>
+    <div id="fxList"><div class="muted">No data yet.</div></div>
+  </div>
+
+  <!-- TIEBREAKERS -->
+  <div class="panel tabpanel hidden" id="tab-tiebreak">
+    <h2>🎯 Tiebreaker predictions</h2>
+    <div class="legend">Each player predicts tournament-wide totals. Used only to separate players level on points. Predictions are saved in this browser. Tap a cell to edit.</div>
+    <table class="pred">
+      <thead><tr><th>Player</th><th class="num">Goals</th><th class="num">Own goals</th><th class="num">Yellow cards</th><th class="num">Red cards</th></tr></thead>
+      <tbody id="predBody"></tbody>
+      <tfoot><tr>
+        <th>Actual so far</th>
+        <th class="num" id="actGoals">–</th><th class="num" id="actOG">–</th>
+        <th class="num" id="actYel">–</th><th class="num" id="actRed">–</th>
+      </tr></tfoot>
+    </table>
+    <div class="row" style="margin-top:12px">
+      <button onclick="savedraft()">💾 Save predictions</button>
+      <button class="secondary" onclick="computeCardTotals()">Compute card &amp; own-goal totals</button>
+    </div>
+    <div class="status" id="tbStatus"></div>
+    <div class="legend">Total goals is pulled automatically from match scores. Cards &amp; own goals require reading each finished match's events (≈1 API call per match), so it runs only when you press the button. Closest prediction to the final actual wins the tiebreak.</div>
+    <div id="closeness" style="margin-top:10px"></div>
+  </div>
+
+  <!-- DIAGNOSTICS -->
+  <div class="panel">
+    <details>
+      <summary>🔧 Diagnostics (team-name matching)</summary>
+      <div id="diag" class="legend" style="margin-top:10px">Refresh results to check that every owned team is recognised by the API.</div>
+    </details>
+    <div class="legend" style="margin-top:8px">Note: this sweepstake uses 45 teams (5 × 9) from your seeded draw. The 2026 World Cup has 48 teams, and a few names on the list may not have qualified — any team that never appears in the fixtures will simply score 0 and is flagged above.</div>
+  </div>
+
+</div>
+
+<script>
+/* ---------- SWEEPSTAKE DATA (fixed allocation from the draw) ---------- */
+const PLAYERS = [
+  {name:"Paul",   teams:["Brazil","Germany","Morocco","Sweden","Turkey","Bosnia & Herzegovina","South Korea","Iraq","Qatar"]},
+  {name:"Kevin",  teams:["England","Portugal","Colombia","Croatia","Switzerland","Czech Republic","Ghana","Tunisia","New Zealand"]},
+  {name:"Craig",  teams:["France","Norway","Uruguay","Mexico","Canada","Ivory Coast","Scotland","DR Congo","Uzbekistan"]},
+  {name:"Stuart", teams:["Argentina","Netherlands","Japan","Ecuador","Austria","Algeria","Iran","Jordan","Saudi Arabia"]},
+  {name:"Peter",  teams:["Spain","Belgium","USA","Senegal","Paraguay","Egypt","Australia","Cape Verde","Panama"]},
+];
+
+/* Extra name variants the API might use, mapped to our canonical label */
+const ALIASES = {
+  "bosnia and herzegovina":"Bosnia & Herzegovina","bosnia":"Bosnia & Herzegovina","bosnia herzegovina":"Bosnia & Herzegovina",
+  "south korea":"South Korea","korea republic":"South Korea","korea south":"South Korea","republic of korea":"South Korea",
+  "czechia":"Czech Republic","czech republic":"Czech Republic",
+  "cote divoire":"Ivory Coast","côte divoire":"Ivory Coast","cote d ivoire":"Ivory Coast","ivory coast":"Ivory Coast",
+  "congo dr":"DR Congo","dr congo":"DR Congo","democratic republic of congo":"DR Congo","congo democratic republic":"DR Congo","dr congo congo":"DR Congo",
+  "united states":"USA","united states of america":"USA","usa":"USA","us":"USA",
+  "cape verde islands":"Cape Verde","cabo verde":"Cape Verde","cape verde":"Cape Verde",
+  "turkiye":"Turkey","turkey":"Turkey",
+  "iran islamic republic":"Iran","ir iran":"Iran",
+  "holland":"Netherlands",
+};
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+function norm(s){ return (s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g," ").trim(); }
+
+/* build canonical -> owner, and normalized-variant -> canonical */
+const OWNER = {};     // canonical label -> player name
+const CANON = {};     // normalized string -> canonical label
+PLAYERS.forEach(p=>p.teams.forEach(t=>{ OWNER[t]=p.name; CANON[norm(t)]=t; }));
+Object.keys(ALIASES).forEach(k=>{ CANON[norm(k)] = ALIASES[k]; });
+function canonical(apiName){ return CANON[norm(apiName)] || null; }
+
+/* ---------- localStorage ---------- */
+const LS = {
+  key:()=>localStorage.getItem("wc26_key")||"",
+  setKey:v=>localStorage.setItem("wc26_key",v),
+  pred:()=>{ try{return JSON.parse(localStorage.getItem("wc26_pred")||"{}")}catch(e){return {}} },
+  setPred:o=>localStorage.setItem("wc26_pred",JSON.stringify(o)),
+  cfg:()=>{ try{return JSON.parse(localStorage.getItem("wc26_cfg")||"{}")}catch(e){return {}} },
+  setCfg:o=>localStorage.setItem("wc26_cfg",JSON.stringify(o)),
+  fixtures:()=>{ try{return JSON.parse(localStorage.getItem("wc26_fx")||"null")}catch(e){return null} },
+  setFixtures:o=>localStorage.setItem("wc26_fx",JSON.stringify({t:Date.now(),data:o})),
+};
+
+let FIXTURES = [];   // raw fixture objects from API
+let STANDINGS = {};  // canonical team -> {p,w,d,l,gf,ga,pts,out,lastRound}
+
+/* ---------- API ---------- */
+function apiBase(){ return "https://v3.football.api-sports.io"; }
+async function apiGet(path){
+  const key = LS.key();
+  if(!key) throw new Error("No API key saved.");
+  const res = await fetch(apiBase()+path,{headers:{"x-apisports-key":key}});
+  if(!res.ok) throw new Error("HTTP "+res.status+" "+res.statusText);
+  const j = await res.json();
+  if(j.errors && (Array.isArray(j.errors)? j.errors.length : Object.keys(j.errors).length)){
+    throw new Error(typeof j.errors==="object"? JSON.stringify(j.errors): String(j.errors));
+  }
+  return j.response||[];
+}
+
+async function loadData(force){
+  const key = LS.key();
+  const st = $("status");
+  if(!key){ st.innerHTML='<span class="err">Save your API key first.</span>'; return; }
+  const cfg = readCfg();
+  st.textContent = "Loading fixtures…";
+  try{
+    let cached = LS.fixtures();
+    if(!force && cached && (Date.now()-cached.t < 3*60*1000)){
+      FIXTURES = cached.data;
+      st.innerHTML = '<span class="ok">Loaded from cache ('+new Date(cached.t).toLocaleTimeString()+').</span>';
+    } else {
+      FIXTURES = await apiGet(`/fixtures?league=${cfg.leagueId}&season=${cfg.season}`);
+      LS.setFixtures(FIXTURES);
+      st.innerHTML = '<span class="ok">Loaded '+FIXTURES.length+' fixtures at '+new Date().toLocaleTimeString()+'.</span>';
+    }
+    computeStandings();
+    renderAll();
+  }catch(e){
+    st.innerHTML = '<span class="err">Error: '+e.message+'</span> — check your key, or that league/season are correct (World Cup = league 1, season 2026).';
+  }
+}
+
+const FINISHED = new Set(["FT","AET","PEN"]);
+
+function computeStandings(){
+  STANDINGS = {};
+  // ensure every owned team has a row
+  Object.keys(OWNER).forEach(t=>{ STANDINGS[t]={p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,out:false,lastRound:"",seen:false}; });
+  const cfg = readCfg();
+  FIXTURES.forEach(fx=>{
+    const stat = fx.fixture?.status?.short;
+    const round = fx.league?.round || "";
+    const isKO = /round of|quarter|semi|final|knockout|1\/|play|3rd/i.test(round) && !/group/i.test(round);
+    const homeC = canonical(fx.teams?.home?.name);
+    const awayC = canonical(fx.teams?.away?.name);
+    [["home",homeC],["away",awayC]].forEach(([side,c])=>{ if(c&&STANDINGS[c]) STANDINGS[c].seen=true; });
+    if(!FINISHED.has(stat)) return;
+    const gh = fx.goals?.home ?? 0, ga = fx.goals?.away ?? 0;
+    function apply(c, gf, gaa, winnerFlag){
+      if(!c||!STANDINGS[c]) return;
+      const s = STANDINGS[c];
+      s.p++; s.gf+=gf; s.ga+=gaa; s.lastRound=round;
+      if(gf>gaa){ s.w++; s.pts+=cfg.winPts; }
+      else if(gf===gaa){ s.d++; s.pts+=cfg.drawPts; }
+      else { s.l++; if(isKO) s.out=true; }
+    }
+    apply(homeC, gh, ga);
+    apply(awayC, ga, gh);
+  });
+}
+
+function playerTotals(){
+  const cfg = readCfg();
+  return PLAYERS.map(p=>{
+    let pts=0,w=0,d=0,l=0,gf=0,played=0,alive=0;
+    p.teams.forEach(t=>{
+      const s=STANDINGS[t]; if(!s) return;
+      pts+=s.pts; w+=s.w; d+=s.d; l+=s.l; gf+=s.gf; played+=s.p;
+      if(!s.out) alive++;
+    });
+    return {name:p.name,pts,w,d,l,gf,played,alive,teams:p.teams};
+  }).sort((a,b)=> b.pts-a.pts || b.gf-a.gf || b.w-a.w);
+}
+
+/* ---------- rendering ---------- */
+function renderAll(){ renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderActuals(); renderDiag(); }
+
+function renderLeaderboard(){
+  const rows = playerTotals();
+  const tb = $("lbBody"); tb.innerHTML="";
+  const top = rows.length?rows[0].pts:0;
+  rows.forEach((r,i)=>{
+    const tr=document.createElement("tr");
+    if(i===0 && r.pts>0) tr.className="leader";
+    tr.innerHTML=`<td class="rank">${i+1}</td><td>${r.name}${i===0&&r.pts>0?' 👑':''}</td>
+      <td class="num"><span class="ptsbig">${r.pts}</span></td>
+      <td class="num">${r.played}</td><td class="num">${r.w}</td><td class="num">${r.d}</td><td class="num">${r.l}</td>
+      <td class="num">${r.gf}</td><td class="num">${r.alive}/9</td>`;
+    tb.appendChild(tr);
+  });
+  const cfg=readCfg(); $("lbWin").textContent=cfg.winPts; $("lbDraw").textContent=cfg.drawPts;
+}
+
+function renderTeams(){
+  const grid=$("teamsGrid"); grid.innerHTML="";
+  PLAYERS.forEach(p=>{
+    const card=document.createElement("div"); card.className="teamcard";
+    const total=p.teams.reduce((a,t)=>a+(STANDINGS[t]?STANDINGS[t].pts:0),0);
+    let html=`<div class="row" style="justify-content:space-between"><span class="name">${p.name}</span><span class="ptsbig">${total} pts</span></div>`;
+    p.teams.forEach(t=>{
+      const s=STANDINGS[t]||{p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,out:false,seen:true};
+      const dot=`<span class="flagdot ${s.out?'out':''}"></span>`;
+      const rec = s.p? `${s.w}W ${s.d}D ${s.l}L · ${s.gf}-${s.ga}` : (s.seen?'yet to play':'—');
+      const warn = !s.seen ? ' <span class="pill out">no API match</span>' : (s.out?' <span class="pill out">out</span>':'');
+      html+=`<div class="teamline"><span>${dot}${t}${warn}</span><span class="muted small">${rec} <b style="color:var(--gold)">${s.pts}</b></span></div>`;
+    });
+    card.innerHTML=html; grid.appendChild(card);
+  });
+}
+
+let currentFx="recent";
+function renderFixtures(which){
+  currentFx=which||currentFx;
+  $("fxRecent").className="tab"+(currentFx==="recent"?" active":"");
+  $("fxUpcoming").className="tab"+(currentFx==="upcoming"?" active":"");
+  const list=$("fxList"); list.innerHTML="";
+  let arr=FIXTURES.slice();
+  if(currentFx==="recent"){
+    arr=arr.filter(f=>FINISHED.has(f.fixture?.status?.short)).sort((a,b)=> new Date(b.fixture.date)-new Date(a.fixture.date)).slice(0,25);
+  }else{
+    arr=arr.filter(f=>!FINISHED.has(f.fixture?.status?.short)).sort((a,b)=> new Date(a.fixture.date)-new Date(b.fixture.date)).slice(0,25);
+  }
+  if(!arr.length){ list.innerHTML='<div class="muted">Nothing to show yet.</div>'; return; }
+  arr.forEach(f=>{
+    const d=new Date(f.fixture.date);
+    const when = currentFx==="recent" ? d.toLocaleDateString() : d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    const sc = FINISHED.has(f.fixture.status.short) ? `${f.goals.home}–${f.goals.away}` : f.fixture.status.short;
+    const ownH=ownTag(f.teams.home.name), ownA=ownTag(f.teams.away.name);
+    const div=document.createElement("div"); div.className="fx";
+    div.innerHTML=`<span class="when">${when}</span>
+      <span style="flex:1;text-align:right">${f.teams.home.name}${ownH}</span>
+      <span class="score">${sc}</span>
+      <span style="flex:1">${ownA}${f.teams.away.name}</span>`;
+    list.appendChild(div);
+  });
+}
+function ownTag(name){ const c=canonical(name); return c? ` <span class="owner-chip">(${OWNER[c]})</span>`:""; }
+
+/* ---------- tiebreakers ---------- */
+function renderPredTable(){
+  const pred=LS.pred(); const tb=$("predBody"); tb.innerHTML="";
+  PLAYERS.forEach(p=>{
+    const v=pred[p.name]||{};
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${p.name}</td>
+      ${["goals","og","yel","red"].map(k=>`<td class="num"><input type="number" min="0" data-player="${p.name}" data-field="${k}" value="${v[k]??''}"></td>`).join("")}`;
+    tb.appendChild(tr);
+  });
+}
+function savedraft(){
+  const pred={};
+  document.querySelectorAll('#predBody input').forEach(inp=>{
+    const pl=inp.dataset.player, f=inp.dataset.field;
+    pred[pl]=pred[pl]||{}; if(inp.value!=="") pred[pl][f]=Number(inp.value);
+  });
+  LS.setPred(pred); $("tbStatus").innerHTML='<span class="ok">Predictions saved.</span>';
+  renderCloseness();
+}
+function renderActuals(){
+  // total goals from finished fixtures (cheap)
+  let g=0,finished=0;
+  FIXTURES.forEach(f=>{ if(FINISHED.has(f.fixture?.status?.short)){ g+=(f.goals.home||0)+(f.goals.away||0); finished++; } });
+  $("actGoals").textContent = finished? g : "0";
+  ACT.goals=g;
+  renderCloseness();
+}
+const ACT={goals:0,og:null,yel:null,red:null};
+async function computeCardTotals(){
+  const st=$("tbStatus");
+  const fin=FIXTURES.filter(f=>FINISHED.has(f.fixture?.status?.short));
+  if(!fin.length){ st.innerHTML='<span class="muted">No finished matches yet.</span>'; return; }
+  if(!confirm(`This reads events for ${fin.length} finished match(es) — about ${fin.length} API calls. Continue?`)) return;
+  let og=0,yel=0,red=0,done=0;
+  st.textContent=`Reading events 0/${fin.length}…`;
+  for(const f of fin){
+    try{
+      const ev=await apiGet(`/fixtures/events?fixture=${f.fixture.id}`);
+      ev.forEach(e=>{
+        const type=(e.type||"").toLowerCase(), detail=(e.detail||"").toLowerCase();
+        if(type==="goal" && detail.includes("own")) og++;
+        if(type==="card" && detail.includes("yellow") && !detail.includes("second")) yel++;
+        if(type==="card" && (detail.includes("red")||detail.includes("second yellow"))) red++;
+      });
+    }catch(e){ /* skip individual errors */ }
+    done++; st.textContent=`Reading events ${done}/${fin.length}…`;
+  }
+  ACT.og=og; ACT.yel=yel; ACT.red=red;
+  $("actOG").textContent=og; $("actYel").textContent=yel; $("actRed").textContent=red;
+  st.innerHTML=`<span class="ok">Done. Own goals ${og}, yellows ${yel}, reds ${red}.</span>`;
+  renderCloseness();
+}
+function renderCloseness(){
+  const pred=LS.pred(); const box=$("closeness");
+  const fields=[["goals","Goals",ACT.goals],["og","Own goals",ACT.og],["yel","Yellow cards",ACT.yel],["red","Red cards",ACT.red]];
+  let html='<table><thead><tr><th>Metric</th><th class="num">Actual</th><th>Closest player(s)</th></tr></thead><tbody>';
+  fields.forEach(([k,label,actual])=>{
+    if(actual===null||actual===undefined){ html+=`<tr><td>${label}</td><td class="num muted">not computed</td><td class="muted">—</td></tr>`; return; }
+    let best=Infinity,winners=[];
+    PLAYERS.forEach(p=>{ const g=pred[p.name]&&pred[p.name][k]; if(g===undefined||g===null) return;
+      const diff=Math.abs(g-actual); if(diff<best){best=diff;winners=[p.name];} else if(diff===best){winners.push(p.name);} });
+    html+=`<tr><td>${label}</td><td class="num">${actual}</td><td>${winners.length?winners.join(", ")+` <span class="muted small">(off by ${best})</span>`:'<span class="muted">no predictions</span>'}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  box.innerHTML=html;
+}
+
+/* ---------- diagnostics ---------- */
+function renderDiag(){
+  const missing=Object.keys(OWNER).filter(t=>!(STANDINGS[t]&&STANDINGS[t].seen));
+  const d=$("diag");
+  if(!FIXTURES.length){ d.textContent="Refresh results to check matching."; return; }
+  if(!missing.length){ d.innerHTML='<span class="ok">All 45 owned teams matched to API fixtures. ✓</span>'; return; }
+  d.innerHTML='<span class="err">Not found in fixtures:</span> '+missing.join(", ")+
+    '<br><span class="muted">These either haven\'t played yet, didn\'t qualify, or the API uses a different name. Tell me which and I\'ll add the alias.</span>';
+}
+
+/* ---------- config & tabs ---------- */
+function readCfg(){
+  const cfg={winPts:Number($("winPts").value)||3, drawPts:Number($("drawPts").value)||1,
+    season:Number($("season").value)||2026, leagueId:Number($("leagueId").value)||1};
+  LS.setCfg(cfg); return cfg;
+}
+["winPts","drawPts","season","leagueId"].forEach(id=>{
+  // listeners added after DOM ready below
+});
+function saveKey(){ const v=$("apiKey").value.trim(); if(v){LS.setKey(v); $("status").innerHTML='<span class="ok">Key saved.</span> Loading…'; loadData(true);} }
+function clearKey(){ LS.setKey(""); $("apiKey").value=""; $("status").textContent="Key cleared."; }
+function showTab(t){
+  document.querySelectorAll(".tabpanel").forEach(p=>p.classList.add("hidden"));
+  $("tab-"+t).classList.remove("hidden");
+  document.querySelectorAll("#tabs .tab").forEach(el=>el.classList.toggle("active", el.dataset.tab===t));
+}
+
+/* ---------- init ---------- */
+(function init(){
+  const cfg=LS.cfg();
+  if(cfg.winPts!=null)$("winPts").value=cfg.winPts;
+  if(cfg.drawPts!=null)$("drawPts").value=cfg.drawPts;
+  if(cfg.season)$("season").value=cfg.season;
+  if(cfg.leagueId)$("leagueId").value=cfg.leagueId;
+  if(LS.key())$("apiKey").value=LS.key();
+  ["winPts","drawPts","season","leagueId"].forEach(id=>$(id).addEventListener("change",()=>{readCfg(); if(FIXTURES.length){computeStandings();renderAll();}}));
+  renderPredTable();
+  renderActuals();
+  if(LS.key()) loadData(false);
+})();
+</script>
+</body>
+</html>

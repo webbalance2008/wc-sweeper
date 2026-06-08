@@ -1,0 +1,13 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Node (only relevant if you later add a build step)
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+npm-debug.log*
