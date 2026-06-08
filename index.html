@@ -262,8 +262,10 @@ async function loadData(force){
 
 const FINISHED = new Set(["FT","AET","PEN"]);
 
+let UNOWNED = {};   // api team name -> true, for teams in the tournament that nobody drew
 function computeStandings(){
   STANDINGS = {};
+  UNOWNED = {};
   // ensure every owned team has a row
   Object.keys(OWNER).forEach(t=>{ STANDINGS[t]={p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,out:false,lastRound:"",seen:false}; });
   const cfg = readCfg();
@@ -273,7 +275,10 @@ function computeStandings(){
     const isKO = /round of|quarter|semi|final|knockout|1\/|play|3rd/i.test(round) && !/group/i.test(round);
     const homeC = canonical(fx.teams?.home?.name);
     const awayC = canonical(fx.teams?.away?.name);
-    [["home",homeC],["away",awayC]].forEach(([side,c])=>{ if(c&&STANDINGS[c]) STANDINGS[c].seen=true; });
+    [["home",homeC,fx.teams?.home?.name],["away",awayC,fx.teams?.away?.name]].forEach(([side,c,nm])=>{
+      if(c&&STANDINGS[c]) STANDINGS[c].seen=true;
+      else if(nm) UNOWNED[nm]=true;
+    });
     if(!FINISHED.has(stat)) return;
     const gh = fx.goals?.home ?? 0, ga = fx.goals?.away ?? 0;
     function apply(c, gf, gaa, winnerFlag){
@@ -437,11 +442,16 @@ function renderCloseness(){
 /* ---------- diagnostics ---------- */
 function renderDiag(){
   const missing=Object.keys(OWNER).filter(t=>!(STANDINGS[t]&&STANDINGS[t].seen));
+  const unowned=Object.keys(UNOWNED).sort();
   const d=$("diag");
   if(!FIXTURES.length){ d.textContent="Refresh results to check matching."; return; }
-  if(!missing.length){ d.innerHTML='<span class="ok">All 45 owned teams matched to API fixtures. ✓</span>'; return; }
-  d.innerHTML='<span class="err">Not found in fixtures:</span> '+missing.join(", ")+
-    '<br><span class="muted">These either haven\'t played yet, didn\'t qualify, or the API uses a different name. Tell me which and I\'ll add the alias.</span>';
+  let html = missing.length
+    ? '<span class="err">Owned teams not found in fixtures:</span> '+missing.join(", ")+
+      '<br><span class="muted">These either haven\'t played yet, didn\'t qualify, or the API uses a different name.</span>'
+    : '<span class="ok">All 45 owned teams matched to API fixtures. ✓</span>';
+  html += '<br><br><b>Teams in the tournament that nobody drew ('+unowned.length+'):</b> '+
+    (unowned.length ? unowned.join(", ") : '—');
+  d.innerHTML = html;
 }
 
 /* ---------- config & tabs ---------- */
