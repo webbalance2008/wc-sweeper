@@ -80,13 +80,15 @@
 
   <!-- SETUP -->
   <div class="panel" id="setupPanel">
-    <h2>🔑 Setup</h2>
-    <div class="row">
-      <input type="password" id="apiKey" placeholder="Paste your api-sports.io API key" style="flex:1;min-width:220px">
-      <button onclick="saveKey()">Save key</button>
-      <button class="secondary" onclick="clearKey()">Clear</button>
+    <h2>⚙️ Setup</h2>
+    <div id="keyRow">
+      <div class="row">
+        <input type="password" id="apiKey" placeholder="Paste your api-sports.io API key" style="flex:1;min-width:220px">
+        <button onclick="saveKey()">Save key</button>
+        <button class="secondary" onclick="clearKey()">Clear</button>
+      </div>
+      <div class="legend">Your key is stored only in this browser (localStorage) and is sent straight to api-sports.io — it is never hard-coded into this file or shared. Get a key at <span class="ok">dashboard.api-football.com</span>.</div>
     </div>
-    <div class="legend">Your key is stored only in this browser (localStorage) and is sent straight to api-sports.io — it is never hard-coded into this file or shared. Get a key at <span class="ok">dashboard.api-football.com</span>.</div>
     <div class="row" style="margin-top:12px">
       <label class="small muted">Points per win <input type="number" id="winPts" value="3" min="0" style="width:60px"></label>
       <label class="small muted">Points per draw <input type="number" id="drawPts" value="1" min="0" style="width:60px"></label>
@@ -218,11 +220,15 @@ let FIXTURES = [];   // raw fixture objects from API
 let STANDINGS = {};  // canonical team -> {p,w,d,l,gf,ga,pts,out,lastRound}
 
 /* ---------- API ---------- */
-function apiBase(){ return "https://v3.football.api-sports.io"; }
+/* USE_PROXY: key lives server-side as a Cloudflare secret (API_FOOTBALL_KEY),
+   accessed via the Pages Function at /api. No key is needed in the browser. */
+const USE_PROXY = true;
+function apiBase(){ return USE_PROXY ? "/api" : "https://v3.football.api-sports.io"; }
 async function apiGet(path){
   const key = LS.key();
-  if(!key) throw new Error("No API key saved.");
-  const res = await fetch(apiBase()+path,{headers:{"x-apisports-key":key}});
+  if(!USE_PROXY && !key) throw new Error("No API key saved.");
+  const headers = USE_PROXY ? {} : {"x-apisports-key":key};
+  const res = await fetch(apiBase()+path,{headers});
   if(!res.ok) throw new Error("HTTP "+res.status+" "+res.statusText);
   const j = await res.json();
   if(j.errors && (Array.isArray(j.errors)? j.errors.length : Object.keys(j.errors).length)){
@@ -234,7 +240,7 @@ async function apiGet(path){
 async function loadData(force){
   const key = LS.key();
   const st = $("status");
-  if(!key){ st.innerHTML='<span class="err">Save your API key first.</span>'; return; }
+  if(!USE_PROXY && !key){ st.innerHTML='<span class="err">Save your API key first.</span>'; return; }
   const cfg = readCfg();
   st.textContent = "Loading fixtures…";
   try{
@@ -463,10 +469,11 @@ function showTab(t){
   if(cfg.season)$("season").value=cfg.season;
   if(cfg.leagueId)$("leagueId").value=cfg.leagueId;
   if(LS.key())$("apiKey").value=LS.key();
+  if(USE_PROXY){ const kr=$("keyRow"); if(kr) kr.style.display="none"; $("status").textContent="Loading live results…"; }
   ["winPts","drawPts","season","leagueId"].forEach(id=>$(id).addEventListener("change",()=>{readCfg(); if(FIXTURES.length){computeStandings();renderAll();}}));
   renderPredTable();
   renderActuals();
-  if(LS.key()) loadData(false);
+  if(USE_PROXY || LS.key()) loadData(false);
 })();
 </script>
 </body>
