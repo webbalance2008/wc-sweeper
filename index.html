@@ -166,7 +166,8 @@
   <!-- TIEBREAKERS -->
   <div class="panel tabpanel hidden" id="tab-tiebreak">
     <h2>🎯 Tiebreaker predictions</h2>
-    <div class="legend">Each player predicts tournament-wide totals. Used only to separate players level on points. Predictions are saved in this browser.</div>
+    <div class="legend">Each player fills in their own card and taps Save. Predictions are shared — everyone sees the same numbers — and lock automatically once the first match kicks off.</div>
+    <div id="lockBanner" class="legend" style="margin-top:6px"></div>
     <div class="predcards" id="predCards"></div>
     <div class="actualcard">
       <div class="pname">📊 Actual so far</div>
@@ -178,7 +179,6 @@
       </div>
     </div>
     <div class="row" style="margin-top:12px">
-      <button onclick="savedraft()">💾 Save predictions</button>
       <button class="secondary" onclick="computeCardTotals()">Compute card &amp; own-goal totals</button>
     </div>
     <div class="status" id="tbStatus"></div>
@@ -336,7 +336,7 @@ function playerTotals(){
 }
 
 /* ---------- rendering ---------- */
-function renderAll(){ renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderActuals(); renderDiag(); }
+function renderAll(){ renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderActuals(); renderDiag(); renderPredTable(); }
 
 function renderLeaderboard(){
   const rows = playerTotals();
@@ -399,27 +399,67 @@ function renderFixtures(which){
 }
 function ownTag(name){ const c=canonical(name); return c? ` <span class="owner-chip">(${OWNER[c]})</span>`:""; }
 
-/* ---------- tiebreakers ---------- */
+/* ---------- tiebreakers (shared storage + lock) ---------- */
 const PRED_FIELDS=[["goals","Goals"],["og","Own goals"],["yel","Yellow cards"],["red","Red cards"]];
+let PRED = {};   // shared predictions loaded from /api/predictions
+
+// Locked once the first match has kicked off (computed from loaded fixtures; server also enforces).
+function tournamentStartMs(){
+  const ds=FIXTURES.map(f=>f.fixture&&f.fixture.date).filter(Boolean).sort();
+  return ds.length? Date.parse(ds[0]) : null;
+}
+function isLockedClient(){ const t=tournamentStartMs(); return t? Date.now()>=t : false; }
+
+function updateLockBanner(){
+  const b=$("lockBanner"); if(!b) return;
+  const t=tournamentStartMs();
+  if(t && Date.now()>=t){ b.innerHTML='🔒 <b class="err">Predictions are locked</b> — the tournament has started.'; }
+  else if(t){ b.innerHTML='🟢 Open until first kickoff — '+new Date(t).toLocaleString(); }
+  else { b.innerHTML='🟢 Open for predictions.'; }
+}
+
+async function loadPredictions(){
+  try{
+    const r=await fetch("/api/predictions",{cache:"no-store"});
+    if(r.ok){ const j=await r.json(); PRED = j.predictions || {}; }
+  }catch(e){ /* keep whatever we have */ }
+  renderPredTable(); renderCloseness();
+}
+
 function renderPredTable(){
-  const pred=LS.pred(); const box=$("predCards"); box.innerHTML="";
+  const box=$("predCards"); if(!box) return; box.innerHTML="";
+  const locked=isLockedClient();
   PLAYERS.forEach(p=>{
-    const v=pred[p.name]||{};
+    const v=PRED[p.name]||{};
     const card=document.createElement("div"); card.className="predcard";
     card.innerHTML=`<div class="pname">${p.name}</div>
       <div class="predfields">${PRED_FIELDS.map(([k,lab])=>
-        `<label>${lab}<input type="number" min="0" inputmode="numeric" data-player="${p.name}" data-field="${k}" value="${v[k]??''}"></label>`).join("")}</div>`;
+        `<label>${lab}<input type="number" min="0" inputmode="numeric" data-player="${p.name}" data-field="${k}" value="${v[k]??''}" ${locked?'disabled':''}></label>`).join("")}</div>
+      <div class="row" style="margin-top:8px;justify-content:space-between;align-items:center">
+        ${locked ? '<span class="pill out">🔒 locked</span>'
+                 : '<button onclick="savePlayer(\''+p.name+'\')">💾 Save '+p.name+'</button>'}
+        <span class="small" id="ps-${p.name}"></span>
+      </div>`;
     box.appendChild(card);
   });
+  updateLockBanner();
 }
-function savedraft(){
-  const pred={};
-  document.querySelectorAll('#predCards input').forEach(inp=>{
-    const pl=inp.dataset.player, f=inp.dataset.field;
-    pred[pl]=pred[pl]||{}; if(inp.value!=="") pred[pl][f]=Number(inp.value);
+
+async function savePlayer(name){
+  const stat=$("ps-"+name); if(stat) stat.innerHTML='<span class="muted">saving…</span>';
+  const values={};
+  document.querySelectorAll('#predCards input[data-player="'+name+'"]').forEach(inp=>{
+    if(inp.value!=="") values[inp.dataset.field]=Number(inp.value);
   });
-  LS.setPred(pred); $("tbStatus").innerHTML='<span class="ok">Predictions saved.</span>';
-  renderCloseness();
+  try{
+    const r=await fetch("/api/predictions",{method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({player:name,values})});
+    if(r.status===403){ if(stat) stat.innerHTML='<span class="err">locked — tournament started</span>'; renderPredTable(); return; }
+    if(!r.ok){ const t=await r.text(); if(stat) stat.innerHTML='<span class="err">save failed</span>'; console.warn(t); return; }
+    const j=await r.json(); PRED = j.predictions || PRED;
+    if(stat) stat.innerHTML='<span class="ok">saved ✓ (visible to everyone)</span>';
+    renderCloseness();
+  }catch(e){ if(stat) stat.innerHTML='<span class="err">network error</span>'; }
 }
 function renderActuals(){
   // total goals from finished fixtures (cheap)
@@ -455,7 +495,7 @@ async function computeCardTotals(){
   renderCloseness();
 }
 function renderCloseness(){
-  const pred=LS.pred(); const box=$("closeness");
+  const pred=PRED; const box=$("closeness");
   const fields=[["goals","Goals",ACT.goals],["og","Own goals",ACT.og],["yel","Yellow cards",ACT.yel],["red","Red cards",ACT.red]];
   let html='<div class="tablewrap"><table><thead><tr><th>Metric</th><th class="num">Actual</th><th>Closest player(s)</th></tr></thead><tbody>';
   fields.forEach(([k,label,actual])=>{
@@ -511,7 +551,7 @@ function showTab(t){
   if(LS.key())$("apiKey").value=LS.key();
   if(USE_PROXY){ const kr=$("keyRow"); if(kr) kr.style.display="none"; $("status").textContent="Loading live results…"; }
   ["winPts","drawPts","season","leagueId"].forEach(id=>$(id).addEventListener("change",()=>{readCfg(); if(FIXTURES.length){computeStandings();renderAll();}}));
-  renderPredTable();
+  loadPredictions();
   renderActuals();
   if(USE_PROXY || LS.key()) loadData(false);
 })();
