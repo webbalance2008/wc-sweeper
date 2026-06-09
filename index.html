@@ -74,9 +74,13 @@
   .hlgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   @media(max-width:640px){.hlgrid{grid-template-columns:1fr}}
   .hlcard{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;
-    padding:10px 12px;background:var(--panel2);text-decoration:none;color:var(--text);transition:border-color .15s,transform .05s}
+    padding:10px 12px;background:var(--panel2);text-decoration:none;color:var(--text);cursor:pointer;transition:border-color .15s,transform .05s}
   .hlcard:hover{border-color:var(--accent)}
   .hlcard:active{transform:scale(.99)}
+  .hlcard.playing{display:block;cursor:default}
+  .hlcard.playing:hover{border-color:var(--line)}
+  .hlframewrap{position:relative;width:100%;padding-top:56.25%}
+  .hlframe{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:8px}
   .hlplay{flex:none;width:40px;height:40px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
   .hlmeta{flex:1;min-width:0}
   .hlteams{font-weight:600}
@@ -481,27 +485,44 @@ function renderFixtures(which){
 }
 function ownTag(name){ const c=canonical(name); return c? ` <span class="owner-chip">(${OWNER[c]})</span>`:""; }
 
+let HL_FIN=[];
+function hlQuery(f){ return f.teams.home.name+" vs "+f.teams.away.name+" World Cup 2026 highlights"; }
+function hlSearch(f){ return "https://www.youtube.com/results?search_query="+encodeURIComponent(hlQuery(f)); }
 function renderHighlights(){
   const box=$("hlList"); if(!box) return;
-  const fin=FIXTURES.filter(f=>FINISHED.has(f.fixture?.status?.short))
+  HL_FIN=FIXTURES.filter(f=>FINISHED.has(f.fixture?.status?.short))
     .sort((a,b)=> new Date(b.fixture.date)-new Date(a.fixture.date));
-  if(!fin.length){ box.innerHTML='<div class="muted">No completed matches yet — highlights appear here once games finish.</div>'; return; }
+  if(!HL_FIN.length){ box.innerHTML='<div class="muted">No completed matches yet — highlights appear here once games finish.</div>'; return; }
   let html='<div class="hlgrid">';
-  fin.forEach(f=>{
+  HL_FIN.forEach((f,i)=>{
     const h=f.teams.home.name, a=f.teams.away.name;
-    const q=encodeURIComponent(h+" vs "+a+" World Cup 2026 highlights");
-    const url="https://www.youtube.com/results?search_query="+q;
     const when=new Date(f.fixture.date).toLocaleDateString();
     const round=f.league?.round||"";
-    html+=`<a class="hlcard" href="${url}" target="_blank" rel="noopener noreferrer">
+    html+=`<div class="hlcard" id="hl-${i}" onclick="playHighlight(${i})">
       <span class="hlplay">▶</span>
       <span class="hlmeta">
         <div class="hlteams">${h} <span class="hlscore">${f.goals.home}–${f.goals.away}</span> ${a}</div>
         <div class="hlsub">${when}${round?' · '+round:''}</div>
-      </span></a>`;
+      </span></div>`;
   });
-  html+='</div>';
-  box.innerHTML=html;
+  box.innerHTML=html+'</div>';
+}
+async function playHighlight(i){
+  const f=HL_FIN[i], card=$("hl-"+i); if(!f||!card) return;
+  const search=hlSearch(f);
+  if(TEST_MODE){ window.open(search,"_blank","noopener"); return; }   // don't spend YouTube quota on fake games
+  const prev=card.innerHTML; card.onclick=null;
+  card.innerHTML='<div class="muted small" style="padding:4px 2px">Loading highlights…</div>';
+  let vid=null;
+  try{ const r=await fetch("/api/highlight?q="+encodeURIComponent(hlQuery(f))); if(r.ok){ const j=await r.json(); vid=j.videoId||null; } }catch(e){}
+  if(vid){
+    card.classList.add("playing");
+    card.innerHTML='<div class="hlframewrap"><iframe class="hlframe" src="https://www.youtube-nocookie.com/embed/'+vid+'?autoplay=1" title="Match highlights" allow="autoplay; encrypted-media; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>'+
+      '<div class="hlsub" style="margin-top:6px">'+f.teams.home.name+' '+f.goals.home+'–'+f.goals.away+' '+f.teams.away.name+' · <a href="'+search+'" target="_blank" rel="noopener">open on YouTube</a></div>';
+  } else {
+    card.innerHTML=prev; card.onclick=()=>playHighlight(i);
+    window.open(search,"_blank","noopener");   // fallback: no embeddable result found
+  }
 }
 
 /* ---------- tiebreakers (shared storage + lock) ---------- */
