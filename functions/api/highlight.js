@@ -8,7 +8,12 @@ const PREFIX = "yt:";
 const TTL = 60 * 60 * 24 * 30; // cache a found video for 30 days
 
 export async function onRequestGet({ request, env }) {
-  const q = (new URL(request.url).searchParams.get("q") || "").trim();
+  const url = new URL(request.url);
+  if (url.searchParams.get("debug") === "1") {
+    // names only — never returns values
+    return json({ envKeys: Object.keys(env || {}).sort(), hasYouTubeKey: !!(env && env.YOUTUBE_API_KEY) });
+  }
+  const q = (url.searchParams.get("q") || "").trim();
   if (!q) return json({ error: "missing q", videoId: null }, 400);
   if (!env.YOUTUBE_API_KEY) return json({ error: "YOUTUBE_API_KEY not configured", videoId: null });
 
