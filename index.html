@@ -426,24 +426,38 @@ async function loadPredictions(){
   renderPredTable(); renderCloseness();
 }
 
+const EDITING = new Set();   // players whose saved card has been re-opened for editing
+function hasSaved(name){ const v=PRED[name]; return v && Object.keys(v).length>0; }
+
 function renderPredTable(){
   const box=$("predCards"); if(!box) return; box.innerHTML="";
-  const locked=isLockedClient();
+  const gLock=isLockedClient();
   PLAYERS.forEach(p=>{
     const v=PRED[p.name]||{};
+    const saved=hasSaved(p.name);
+    const editing=EDITING.has(p.name);
+    const locked = gLock || (saved && !editing);   // disable once saved (or after kickoff)
     const card=document.createElement("div"); card.className="predcard";
+    let footer;
+    if(gLock){ footer='<span class="pill out">🔒 locked</span>'; }
+    else if(saved && !editing){
+      footer='<span class="pill win">🔒 saved</span>'+
+             '<a href="#" class="small muted" onclick="editPlayer(\''+p.name+'\');return false">edit</a>';
+    } else {
+      footer='<button onclick="savePlayer(\''+p.name+'\')">💾 Save '+p.name+'</button>';
+    }
     card.innerHTML=`<div class="pname">${p.name}</div>
       <div class="predfields">${PRED_FIELDS.map(([k,lab])=>
         `<label>${lab}<input type="number" min="0" inputmode="numeric" data-player="${p.name}" data-field="${k}" value="${v[k]??''}" ${locked?'disabled':''}></label>`).join("")}</div>
       <div class="row" style="margin-top:8px;justify-content:space-between;align-items:center">
-        ${locked ? '<span class="pill out">🔒 locked</span>'
-                 : '<button onclick="savePlayer(\''+p.name+'\')">💾 Save '+p.name+'</button>'}
+        ${footer}
         <span class="small" id="ps-${p.name}"></span>
       </div>`;
     box.appendChild(card);
   });
   updateLockBanner();
 }
+function editPlayer(name){ if(isLockedClient()) return; EDITING.add(name); renderPredTable(); }
 
 async function savePlayer(name){
   const stat=$("ps-"+name); if(stat) stat.innerHTML='<span class="muted">saving…</span>';
@@ -458,7 +472,9 @@ async function savePlayer(name){
     if(!r.ok){ const t=await r.text(); let msg='save failed ('+r.status+')'; try{ const e=JSON.parse(t); msg=e.message||e.error||msg; }catch(_){}
       if(stat) stat.innerHTML='<span class="err">'+msg+'</span>'; console.warn('save failed',r.status,t); return; }
     const j=await r.json(); PRED = j.predictions || PRED;
-    if(stat) stat.innerHTML='<span class="ok">saved ✓ (visible to everyone)</span>';
+    EDITING.delete(name);
+    renderPredTable();        // re-render so the card locks/disables
+    const s2=$("ps-"+name); if(s2) s2.innerHTML='<span class="ok">saved ✓</span>';
     renderCloseness();
   }catch(e){ if(stat) stat.innerHTML='<span class="err">network error</span>'; }
 }
