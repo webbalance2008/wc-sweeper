@@ -325,7 +325,7 @@ async function loadData(force){
   st.textContent = "Loading fixtures…";
   try{
     let cached = LS.fixtures();
-    if(!force && cached && (Date.now()-cached.t < 3*60*1000)){
+    if(!force && cached && (Date.now()-cached.t < 10*60*1000)){
       FIXTURES = cached.data;
       st.innerHTML = '<span class="ok">Loaded from cache ('+new Date(cached.t).toLocaleTimeString()+').</span>';
     } else {
@@ -474,9 +474,9 @@ function updateLockBanner(){
 
 async function loadPredictions(){
   try{
-    const r=await fetch("/api/predictions",{cache:"no-store"});
+    const r=await fetch("/api/predictions",{cache:"no-store",signal:AbortSignal.timeout(8000)});
     if(r.ok){ const j=await r.json(); PRED = j.predictions || {}; }
-  }catch(e){ /* keep whatever we have */ }
+  }catch(e){ /* keep whatever we have — cards already rendered */ }
   renderPredTable(); renderCloseness();
 }
 
@@ -620,7 +620,8 @@ function showTab(t){
   if(LS.key())$("apiKey").value=LS.key();
   if(USE_PROXY){ const kr=$("keyRow"); if(kr) kr.style.display="none"; $("status").textContent="Loading live results…"; }
   ["winPts","drawPts","season","leagueId"].forEach(id=>$(id).addEventListener("change",()=>{readCfg(); if(FIXTURES.length){computeStandings();renderAll();}}));
-  loadPredictions();
+  renderPredTable();     // draw the player cards immediately (don't wait on the network)
+  loadPredictions();     // then load shared saved values and re-render
   renderActuals();
   if(USE_PROXY || LS.key()) loadData(false);
 })();
