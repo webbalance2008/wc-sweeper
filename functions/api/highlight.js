@@ -15,7 +15,8 @@ export async function onRequestGet({ request, env }) {
   }
   const q = (url.searchParams.get("q") || "").trim();
   if (!q) return json({ error: "missing q", videoId: null }, 400);
-  if (!env.YOUTUBE_API_KEY) return json({ error: "YOUTUBE_API_KEY not configured", videoId: null });
+  const ytKey = envVar(env, "YOUTUBE_API_KEY");   // tolerant of stray spaces in the var name
+  if (!ytKey) return json({ error: "YOUTUBE_API_KEY not configured", videoId: null });
 
   const cacheKey = PREFIX + q.toLowerCase();
 
@@ -30,7 +31,7 @@ export async function onRequestGet({ request, env }) {
     const api = "https://www.googleapis.com/youtube/v3/search"
       + "?part=snippet&type=video&videoEmbeddable=true&maxResults=1"
       + "&q=" + encodeURIComponent(q)
-      + "&key=" + env.YOUTUBE_API_KEY;
+      + "&key=" + ytKey;
     const r = await fetch(api);
     const j = await r.json();
     if (j.error) return json({ error: j.error.message || "youtube error", videoId: null }, 502);
@@ -50,4 +51,12 @@ function json(obj, status) {
     status: status || 200,
     headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
+}
+
+// Read an env var by name, tolerating accidental leading/trailing spaces in the configured name.
+function envVar(env, name) {
+  if (!env) return undefined;
+  if (env[name]) return env[name];
+  for (const k of Object.keys(env)) { if (k.trim() === name && env[k]) return env[k]; }
+  return undefined;
 }
