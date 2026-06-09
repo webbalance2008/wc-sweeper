@@ -455,7 +455,8 @@ async function savePlayer(name){
     const r=await fetch("/api/predictions",{method:"POST",headers:{"content-type":"application/json"},
       body:JSON.stringify({player:name,values})});
     if(r.status===403){ if(stat) stat.innerHTML='<span class="err">locked — tournament started</span>'; renderPredTable(); return; }
-    if(!r.ok){ const t=await r.text(); if(stat) stat.innerHTML='<span class="err">save failed</span>'; console.warn(t); return; }
+    if(!r.ok){ const t=await r.text(); let msg='save failed ('+r.status+')'; try{ const e=JSON.parse(t); msg=e.message||e.error||msg; }catch(_){}
+      if(stat) stat.innerHTML='<span class="err">'+msg+'</span>'; console.warn('save failed',r.status,t); return; }
     const j=await r.json(); PRED = j.predictions || PRED;
     if(stat) stat.innerHTML='<span class="ok">saved ✓ (visible to everyone)</span>';
     renderCloseness();
