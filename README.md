@@ -17,7 +17,7 @@ directly in the browser. No backend.
 ## Scoring
 
 - **3 points** per win, **1 point** per draw (both editable in the page), summed across each player's 9 teams over every tournament match.
-- Matches decided on penalties count as a draw (level on goals).
+- A penalty-shootout win counts as a full win (3 points); the loser takes a loss.
 - Tiebreakers: predicted tournament totals for goals, own goals, yellow cards, red cards. Closest prediction wins the tiebreak.
 
 ## Running it
@@ -50,7 +50,7 @@ git init
 git add .
 git commit -m "Initial commit: World Cup 2026 sweepstake"
 git branch -M main
-git remote add origin https://github.com/<your-username>/wc26-sweepstake.git
+git remote add origin https://github.com/webbalance2008/wc-sweeper
 git push -u origin main
 ```
 

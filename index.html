@@ -165,7 +165,7 @@
       <tbody id="lbBody"><tr><td colspan="9" class="muted">No data yet — refresh results.</td></tr></tbody>
     </table>
     </div>
-    <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. Matches decided on penalties count as draws (level on goals). “Alive” = teams not yet knocked out.</div>
+    <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. A penalty-shootout win counts as a full win (3). “Alive” = teams not yet knocked out.</div>
   </div>
 
   <!-- TEAMS -->
@@ -290,20 +290,27 @@ function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=rnd(i+1
 function makeMockFixtures(){
   const teams=[]; PLAYERS.forEach(p=>p.teams.forEach(t=>teams.push(t)));
   const fx=[]; let id=1; const base=Date.now()-25*864e5;
-  const push=(round,h,a,gh,ga,status)=>fx.push({
+  const push=(round,h,a,gh,ga,status,hWin,aWin)=>fx.push({
     fixture:{id:"T"+(id++),date:new Date(base+id*72e5).toISOString(),status:{short:status||"FT"}},
-    league:{round},teams:{home:{name:h},away:{name:a}},goals:{home:gh,away:ga}});
+    league:{round},teams:{home:{name:h,winner:hWin},away:{name:a,winner:aWin}},goals:{home:gh,away:ga}});
   // group stage: 3 matchdays, results can be wins/draws
   for(let md=1;md<=3;md++){ const s=shuffle(teams); for(let i=0;i+1<s.length;i+=2) push("Group Stage - "+md,s[i],s[i+1],rnd(4),rnd(4)); }
-  // knockouts: always decisive, so losers get eliminated
+  // knockouts: always decisive (incl. some on penalties), so losers get eliminated
   let alive=shuffle(teams).slice(0,16);
   [["Round of 16"],["Quarter-finals"],["Semi-finals"],["Final"]].forEach(([round])=>{
     const winners=[];
     for(let i=0;i+1<alive.length;i+=2){
-      let gh=rnd(4), ga=rnd(4); if(gh===ga) gh++;            // force a winner
-      const status = (Math.random()<0.25)?"AET":"FT";
-      push(round,alive[i],alive[i+1],gh,ga,status);
-      winners.push(gh>ga?alive[i]:alive[i+1]);
+      const h=alive[i], a=alive[i+1];
+      if(Math.random()<0.25){            // decided on penalties: level on goals, winner via flag
+        const lvl=rnd(3); const homeAdvances=Math.random()<0.5;
+        push(round,h,a,lvl,lvl,"PEN",homeAdvances,!homeAdvances);
+        winners.push(homeAdvances?h:a);
+      } else {
+        let gh=rnd(4), ga=rnd(4); if(gh===ga) gh++;     // decisive in normal/extra time
+        const status=(Math.random()<0.3)?"AET":"FT";
+        push(round,h,a,gh,ga,status,gh>ga,ga>gh);
+        winners.push(gh>ga?h:a);
+      }
     }
     alive=winners;
   });
@@ -399,16 +406,22 @@ function computeStandings(){
     });
     if(!FINISHED.has(stat)) return;
     const gh = fx.goals?.home ?? 0, ga = fx.goals?.away ?? 0;
-    function apply(c, gf, gaa, winnerFlag){
+    const isPen = stat==="PEN";   // shootout: goals level, decided by winner flag
+    function apply(c, gf, gaa, isWinner){
       if(!c||!STANDINGS[c]) return;
       const s = STANDINGS[c];
       s.p++; s.gf+=gf; s.ga+=gaa; s.lastRound=round;
-      if(gf>gaa){ s.w++; s.pts+=cfg.winPts; }
-      else if(gf===gaa){ s.d++; s.pts+=cfg.drawPts; }
+      let res;
+      if(isPen) res = isWinner ? "W" : "L";   // penalty win counts as a full win
+      else if(gf>gaa) res="W";
+      else if(gf===gaa) res="D";
+      else res="L";
+      if(res==="W"){ s.w++; s.pts+=cfg.winPts; }
+      else if(res==="D"){ s.d++; s.pts+=cfg.drawPts; }
       else { s.l++; if(isKO) s.out=true; }
     }
-    apply(homeC, gh, ga);
-    apply(awayC, ga, gh);
+    apply(homeC, gh, ga, fx.teams?.home?.winner===true);
+    apply(awayC, ga, gh, fx.teams?.away?.winner===true);
   });
 }
 
