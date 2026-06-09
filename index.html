@@ -277,8 +277,13 @@ function makeMockFixtures(){
 function loadTestData(){
   TEST_MODE=true;
   FIXTURES=makeMockFixtures();     // in memory only — not cached, not pushed anywhere
-  computeStandings(); renderAll();
-  $("status").innerHTML='<span style="color:var(--gold)">🧪 TEST DATA loaded ('+FIXTURES.length+' fake fixtures). Numbers are random — click “↻ Refresh results” for live data.</span>';
+  computeStandings();
+  // pre-fill demo card/own-goal totals so the whole tiebreak shows without pressing Compute
+  ACT.og=rnd(13); ACT.yel=180+rnd(200); ACT.red=rnd(11);
+  renderAll();
+  if($("actOG")){ $("actOG").textContent=ACT.og; $("actYel").textContent=ACT.yel; $("actRed").textContent=ACT.red; }
+  renderCloseness();
+  $("status").innerHTML='<span style="color:var(--gold)">🧪 TEST DATA loaded ('+FIXTURES.length+' fake fixtures, all totals filled). Numbers are random — click “↻ Refresh results” for live data.</span>';
 }
 
 /* ---------- API ---------- */
