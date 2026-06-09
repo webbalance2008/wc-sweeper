@@ -120,6 +120,7 @@
       <label class="small muted">Season <input type="number" id="season" value="2026" style="width:80px"></label>
       <label class="small muted">League ID <input type="number" id="leagueId" value="1" style="width:60px"></label>
       <button onclick="loadData(true)">↻ Refresh results</button>
+      <button class="secondary" onclick="loadTestData()">🧪 Test data</button>
     </div>
     <div class="status" id="status">Enter your API key and hit “Refresh results”. (The tournament data will populate as matches kick off.)</div>
   </div>
@@ -247,6 +248,39 @@ const LS = {
 let FIXTURES = [];   // raw fixture objects from API
 let STANDINGS = {};  // canonical team -> {p,w,d,l,gf,ga,pts,out,lastRound}
 
+/* ---------- test data (demo mode, never touches live data or predictions) ---------- */
+let TEST_MODE=false;
+function rnd(n){ return Math.floor(Math.random()*n); }
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function makeMockFixtures(){
+  const teams=[]; PLAYERS.forEach(p=>p.teams.forEach(t=>teams.push(t)));
+  const fx=[]; let id=1; const base=Date.now()-25*864e5;
+  const push=(round,h,a,gh,ga,status)=>fx.push({
+    fixture:{id:"T"+(id++),date:new Date(base+id*72e5).toISOString(),status:{short:status||"FT"}},
+    league:{round},teams:{home:{name:h},away:{name:a}},goals:{home:gh,away:ga}});
+  // group stage: 3 matchdays, results can be wins/draws
+  for(let md=1;md<=3;md++){ const s=shuffle(teams); for(let i=0;i+1<s.length;i+=2) push("Group Stage - "+md,s[i],s[i+1],rnd(4),rnd(4)); }
+  // knockouts: always decisive, so losers get eliminated
+  let alive=shuffle(teams).slice(0,16);
+  [["Round of 16"],["Quarter-finals"],["Semi-finals"],["Final"]].forEach(([round])=>{
+    const winners=[];
+    for(let i=0;i+1<alive.length;i+=2){
+      let gh=rnd(4), ga=rnd(4); if(gh===ga) gh++;            // force a winner
+      const status = (Math.random()<0.25)?"AET":"FT";
+      push(round,alive[i],alive[i+1],gh,ga,status);
+      winners.push(gh>ga?alive[i]:alive[i+1]);
+    }
+    alive=winners;
+  });
+  return fx;
+}
+function loadTestData(){
+  TEST_MODE=true;
+  FIXTURES=makeMockFixtures();     // in memory only — not cached, not pushed anywhere
+  computeStandings(); renderAll();
+  $("status").innerHTML='<span style="color:var(--gold)">🧪 TEST DATA loaded ('+FIXTURES.length+' fake fixtures). Numbers are random — click “↻ Refresh results” for live data.</span>';
+}
+
 /* ---------- API ---------- */
 /* USE_PROXY: key lives server-side as a Cloudflare secret (API_FOOTBALL_KEY),
    accessed via the Pages Function at /api. No key is needed in the browser. */
@@ -266,6 +300,7 @@ async function apiGet(path){
 }
 
 async function loadData(force){
+  TEST_MODE=false;
   const key = LS.key();
   const st = $("status");
   if(!USE_PROXY && !key){ st.innerHTML='<span class="err">Save your API key first.</span>'; return; }
@@ -483,6 +518,12 @@ async function computeCardTotals(){
   const st=$("tbStatus");
   const fin=FIXTURES.filter(f=>FINISHED.has(f.fixture?.status?.short));
   if(!fin.length){ st.innerHTML='<span class="muted">No finished matches yet.</span>'; return; }
+  if(TEST_MODE){
+    ACT.og=rnd(13); ACT.yel=180+rnd(200); ACT.red=rnd(11);
+    $("actOG").textContent=ACT.og; $("actYel").textContent=ACT.yel; $("actRed").textContent=ACT.red;
+    st.innerHTML='<span style="color:var(--gold)">🧪 Test totals — own goals '+ACT.og+', yellows '+ACT.yel+', reds '+ACT.red+'.</span>';
+    renderCloseness(); return;
+  }
   if(!confirm(`This reads events for ${fin.length} finished match(es) — about ${fin.length} API calls. Continue?`)) return;
   let og=0,yel=0,red=0,done=0;
   st.textContent=`Reading events 0/${fin.length}…`;
