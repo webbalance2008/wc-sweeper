@@ -2,13 +2,13 @@
 //   GET  /api/predictions            -> { predictions: { <player>: {goals,og,yel,red} } }
 //   POST /api/predictions {player, values} -> saves one player's card (rejected once locked)
 //
-// LOCK: predictions freeze once the first World Cup match has kicked off. The kickoff
-// time is read from the football API (earliest fixture) so it can't be bypassed client-side.
+// LOCK: predictions freeze at kickoff of the tournament (GO_LIVE). Using a fixed date means
+// no football API call is needed to check the lock — so nothing is fetched before the World Cup.
+// Keep GO_LIVE in sync with the same constant in index.html.
 //
-// Requires two bindings on the Pages project:
+// Requires one binding on the Pages project:
 //   - KV namespace binding named  PREDICTIONS
-//   - Secret named                API_FOOTBALL_KEY
-const UPSTREAM = "https://v3.football.api-sports.io";
+const GO_LIVE = Date.parse("2026-06-11T00:00:00Z");
 const STORE_KEY = "data";
 
 export async function onRequestGet({ env }) {
@@ -20,7 +20,7 @@ export async function onRequestGet({ env }) {
 export async function onRequestPost({ request, env }) {
   if (!env.PREDICTIONS) return json({ error: "KV binding 'PREDICTIONS' is not configured." }, 500);
 
-  if (await tournamentStarted(env)) {
+  if (Date.now() >= GO_LIVE) {
     return json({ error: "locked", message: "Predictions are locked — the tournament has started." }, 403);
   }
 
@@ -44,20 +44,6 @@ export async function onRequestPost({ request, env }) {
   data[player] = clean;
   await env.PREDICTIONS.put(STORE_KEY, JSON.stringify(data));
   return json({ predictions: data });
-}
-
-async function tournamentStarted(env) {
-  try {
-    const r = await fetch(`${UPSTREAM}/fixtures?league=1&season=2026`, {
-      headers: { "x-apisports-key": env.API_FOOTBALL_KEY || "" },
-    });
-    const j = await r.json();
-    const dates = (j.response || []).map(f => f.fixture && f.fixture.date).filter(Boolean).sort();
-    if (!dates.length) return false;            // no fixtures yet -> stay open
-    return Date.now() >= Date.parse(dates[0]);  // first kickoff reached -> locked
-  } catch {
-    return false; // if the check fails, don't lock people out
-  }
 }
 
 function json(obj, status) {

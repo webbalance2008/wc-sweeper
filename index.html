@@ -251,6 +251,10 @@ const LS = {
 let FIXTURES = [];   // raw fixture objects from API
 let STANDINGS = {};  // canonical team -> {p,w,d,l,gf,ga,pts,out,lastRound}
 
+/* Go-live: no football API requests are made before this moment (saves quota pre-tournament).
+   This is also when tiebreaker predictions lock. Kept in sync with the server (functions/api/predictions.js). */
+const GO_LIVE = Date.parse("2026-06-11T00:00:00Z");
+
 /* ---------- test data (demo mode, never touches live data or predictions) ---------- */
 let TEST_MODE=false;
 function rnd(n){ return Math.floor(Math.random()*n); }
@@ -321,6 +325,11 @@ async function loadData(force){
   const key = LS.key();
   const st = $("status");
   if(!USE_PROXY && !key){ st.innerHTML='<span class="err">Save your API key first.</span>'; return; }
+  if(Date.now() < GO_LIVE){
+    FIXTURES=[]; LIVE_START=GO_LIVE; computeStandings(); renderAll();
+    st.innerHTML='<span class="muted">⏳ Live results begin 11 Jun 2026. No data is fetched until kickoff — your teams and predictions are ready below.</span>';
+    return;
+  }
   const cfg = readCfg();
   st.textContent = "Loading fixtures…";
   try{
