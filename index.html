@@ -121,7 +121,7 @@
       <label class="small muted">League ID <input type="number" id="leagueId" value="1" style="width:60px"></label>
     </div>
     <div class="row" style="margin-top:10px">
-      <button onclick="loadData(true)">↻ Refresh results</button>
+      <button id="btnRefresh" onclick="loadData(true)" style="display:none">↻ Refresh results</button>
       <button class="secondary" id="btnTest" onclick="loadTestData()">🧪 Test data</button>
       <button class="secondary" id="btnClearTest" onclick="clearTestData()" style="display:none">🧹 Clear test data</button>
     </div>
@@ -280,6 +280,7 @@ function makeMockFixtures(){
 function clearTestData(){ loadData(true); }   // reload live data, which sets TEST_MODE=false
 function updateTestButtons(){
   const started=tournamentStarted();
+  const rb=$("btnRefresh"); if(rb){ rb.style.display=started?"":"none"; }   // only useful once games are live
   const tb=$("btnTest"); if(tb){ tb.disabled=started; tb.title=started?"Disabled — the tournament has started":""; }
   const cb=$("btnClearTest"); if(cb){ cb.style.display=(TEST_MODE && !started)?"":"none"; }
   if(started && TEST_MODE && !_autoCleared){ _autoCleared=true; loadData(true); }   // auto-clear at kickoff
