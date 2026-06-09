@@ -15,7 +15,7 @@ export async function onRequestGet({ request, env }) {
   }
   const q = (url.searchParams.get("q") || "").trim();
   if (!q) return json({ error: "missing q", videoId: null }, 400);
-  const ytKey = envVar(env, "YOUTUBE_API_KEY");   // tolerant of stray spaces in the var name
+  const ytKey = (envVar(env, "YOUTUBE_API_KEY") || "").trim();   // tolerant of stray spaces in name & value
   if (!ytKey) return json({ error: "YOUTUBE_API_KEY not configured", videoId: null });
 
   const cacheKey = PREFIX + q.toLowerCase();
