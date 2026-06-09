@@ -376,6 +376,9 @@ async function apiGet(path){
 
 async function loadData(force){
   TEST_MODE=false;
+  // clear any test-mode card/own-goal totals (goals get recomputed from fixtures)
+  ACT.og=null; ACT.yel=null; ACT.red=null;
+  if($("actOG")){ $("actOG").textContent="–"; $("actYel").textContent="–"; $("actRed").textContent="–"; }
   const key = LS.key();
   const st = $("status");
   if(!USE_PROXY && !key){ st.innerHTML='<span class="err">Save your API key first.</span>'; return; }
