@@ -491,7 +491,6 @@ function renderTeams(){
     });
     ranked.forEach((t,idx)=>{
       const s=STANDINGS[t]||{p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,out:false,seen:true};
-      const dot=`<span class="flagdot ${s.out?'out':''}"></span>`;
       const warn = !s.seen ? ' <span class="pill out">no API match</span>' : '';
       let stat;
       if(s.p){
@@ -501,7 +500,7 @@ function renderTeams(){
       } else {
         stat=`<span class="muted small">${s.seen?'yet to play':'—'}</span><span class="tpts">0</span>`;
       }
-      html+=`<div class="teamline"><span class="tname"><span class="trank">${idx+1}</span>${dot}${t}${warn}</span><span class="tstat">${stat}</span></div>`;
+      html+=`<div class="teamline"><span class="tname"><span class="trank">${idx+1}</span>${t}${warn}</span><span class="tstat">${stat}</span></div>`;
     });
     card.innerHTML=html; grid.appendChild(card);
   });
