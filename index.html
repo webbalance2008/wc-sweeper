@@ -492,7 +492,7 @@ function renderTeams(){
     ranked.forEach((t,idx)=>{
       const s=STANDINGS[t]||{p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,out:false,seen:true};
       const dot=`<span class="flagdot ${s.out?'out':''}"></span>`;
-      const warn = !s.seen ? ' <span class="pill out">no API match</span>' : (s.out?' <span class="pill out">out</span>':'');
+      const warn = !s.seen ? ' <span class="pill out">no API match</span>' : '';
       let stat;
       if(s.p){
         stat=`<span class="wdl"><b class="w">${s.w}</b><b class="d">${s.d}</b><b class="l">${s.l}</b></span>`+
