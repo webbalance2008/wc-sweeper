@@ -490,13 +490,17 @@ function renderFixtures(which){
   arr.forEach(f=>{
     const d=new Date(f.fixture.date);
     const when = currentFx==="recent" ? d.toLocaleDateString() : d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-    const sc = FINISHED.has(f.fixture.status.short) ? `${f.goals.home}–${f.goals.away}` : f.fixture.status.short;
+    const stat=f.fixture.status.short;
+    const sc = FINISHED.has(stat) ? `${f.goals.home}–${f.goals.away}` : stat;
+    const tagText = stat==="PEN" ? "pens" : stat==="AET" ? "a.e.t." : "";
+    const scoreCell = `${sc}${tagText?`<div style="font-size:10px;color:var(--muted);font-weight:400">${tagText}</div>`:''}`;
+    const win = stat==="PEN" ? (f.teams.home.winner===true?"home":f.teams.away.winner===true?"away":"") : "";
     const ownH=ownTag(f.teams.home.name), ownA=ownTag(f.teams.away.name);
     const div=document.createElement("div"); div.className="fx";
     div.innerHTML=`<span class="when">${when}</span>
-      <span style="flex:1;text-align:right">${f.teams.home.name}${ownH}</span>
-      <span class="score">${sc}</span>
-      <span style="flex:1">${ownA}${f.teams.away.name}</span>`;
+      <span style="flex:1;text-align:right${win==="home"?";font-weight:700":""}">${f.teams.home.name}${ownH}${win==="home"?" ✓":""}</span>
+      <span class="score">${scoreCell}</span>
+      <span style="flex:1${win==="away"?";font-weight:700":""}">${ownA}${f.teams.away.name}${win==="away"?" ✓":""}</span>`;
     list.appendChild(div);
   });
 }
@@ -533,11 +537,13 @@ function renderHighlights(){
     const h=f.teams.home.name, a=f.teams.away.name;
     const when=new Date(f.fixture.date).toLocaleDateString();
     const round=f.league?.round||"";
+    const st=f.fixture?.status?.short;
+    const extra = st==="PEN" ? " (pens)" : st==="AET" ? " (a.e.t.)" : "";
     html+=`<div class="hlcard" id="hl-${i}" onclick="playHighlight(${i})">
       <span class="hlplay">▶</span>
       <span class="hlmeta">
         <div class="hlteams">${h} <span class="hlscore">${f.goals.home}–${f.goals.away}</span> ${a}</div>
-        <div class="hlsub">${when}${round?' · '+round:''}</div>
+        <div class="hlsub">${when}${round?' · '+round:''}${extra}</div>
       </span></div>`;
   });
   box.innerHTML=html+'</div>';
