@@ -187,8 +187,12 @@
   <!-- HIGHLIGHTS -->
   <div class="panel tabpanel hidden" id="tab-highlights">
     <h2>🎬 Highlights</h2>
-    <div class="legend">Every completed match, newest first. Tap a card to open match highlights on YouTube (opens the official search results in a new tab).</div>
-    <div id="hlList" style="margin-top:10px"><div class="muted">No completed matches yet — highlights appear here once games finish.</div></div>
+    <div class="legend">Every completed match, newest first. Tap a card to play the match highlights right here in the page.</div>
+    <div class="row" style="margin:10px 0">
+      <button class="secondary" onclick="playSampleHighlight()">▶ Preview a sample highlight</button>
+    </div>
+    <div id="hlSample" style="margin-bottom:10px"></div>
+    <div id="hlList" style="margin-top:6px"><div class="muted">No completed matches yet — highlights appear here once games finish.</div></div>
   </div>
 
   <!-- TIEBREAKERS -->
@@ -486,6 +490,24 @@ function renderFixtures(which){
 function ownTag(name){ const c=canonical(name); return c? ` <span class="owner-chip">(${OWNER[c]})</span>`:""; }
 
 let HL_FIN=[];
+async function playSampleHighlight(){
+  const box=$("hlSample"); if(!box) return;
+  box.innerHTML='<div class="muted small">Loading sample…</div>';
+  const q="FIFA World Cup 2022 Final Argentina France extended highlights";
+  let vid=null;
+  try{
+    const r=await fetch("/api/highlight?q="+encodeURIComponent(q));
+    const j=await r.json().catch(()=>({}));
+    if(j && j.error){ box.innerHTML='<div class="err small">Highlight proxy error: '+j.error+'</div>'; return; }
+    vid=(j&&j.videoId)||null;
+  }catch(e){ box.innerHTML='<div class="err small">Network error contacting /api/highlight</div>'; return; }
+  if(vid){
+    box.innerHTML='<div class="hlcard playing"><div class="hlframewrap"><iframe class="hlframe" src="https://www.youtube-nocookie.com/embed/'+vid+'?autoplay=1" title="Sample highlight" allow="autoplay; encrypted-media; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>'+
+      '<div class="hlsub" style="margin-top:6px"><span class="ok">✓ Player &amp; YouTube key working.</span></div></div>';
+  }else{
+    box.innerHTML='<div class="muted small">No video returned — check the YOUTUBE_API_KEY secret is set on this Pages project.</div>';
+  }
+}
 function hlQuery(f){ return f.teams.home.name+" vs "+f.teams.away.name+" World Cup 2026 highlights"; }
 function hlSearch(f){ return "https://www.youtube.com/results?search_query="+encodeURIComponent(hlQuery(f)); }
 function renderHighlights(){
