@@ -32,6 +32,15 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "expected { player, values }" }, 400);
   }
 
+  const data = (await env.PREDICTIONS.get(STORE_KEY, "json")) || {};
+
+  // Locked in: once a player has saved a non-empty prediction it can't be changed.
+  // (To reset one, clear that player's key from the KV store.)
+  const existing = data[player];
+  if (existing && Object.keys(existing).length > 0) {
+    return json({ error: "already_saved", message: player + "’s predictions are already locked in." }, 409);
+  }
+
   const clean = {};
   for (const k of ["goals", "og", "yel", "red"]) {
     if (values[k] !== undefined && values[k] !== null && values[k] !== "") {
@@ -40,7 +49,6 @@ export async function onRequestPost({ request, env }) {
     }
   }
 
-  const data = (await env.PREDICTIONS.get(STORE_KEY, "json")) || {};
   data[player] = clean;
   await env.PREDICTIONS.put(STORE_KEY, JSON.stringify(data));
   return json({ predictions: data });
