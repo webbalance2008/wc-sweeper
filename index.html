@@ -70,6 +70,18 @@
   .flagdot.out{background:var(--red)}
   /* horizontal-scroll wrapper for wide tables */
   .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* highlights cards */
+  .hlgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:640px){.hlgrid{grid-template-columns:1fr}}
+  .hlcard{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;background:var(--panel2);text-decoration:none;color:var(--text);transition:border-color .15s,transform .05s}
+  .hlcard:hover{border-color:var(--accent)}
+  .hlcard:active{transform:scale(.99)}
+  .hlplay{flex:none;width:40px;height:40px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px}
+  .hlmeta{flex:1;min-width:0}
+  .hlteams{font-weight:600}
+  .hlsub{font-size:12px;color:var(--muted);margin-top:2px}
+  .hlscore{font-weight:700;color:var(--gold)}
   /* tiebreaker prediction cards */
   .predcards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .predcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
@@ -132,6 +144,7 @@
     <div class="tab active" data-tab="leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</div>
     <div class="tab" data-tab="teams" onclick="showTab('teams')">👥 Players &amp; teams</div>
     <div class="tab" data-tab="fixtures" onclick="showTab('fixtures')">📅 Results &amp; fixtures</div>
+    <div class="tab" data-tab="highlights" onclick="showTab('highlights')">🎬 Highlights</div>
     <div class="tab" data-tab="tiebreak" onclick="showTab('tiebreak')">🎯 Tiebreakers</div>
   </div>
 
@@ -165,6 +178,13 @@
       <div class="tab" id="fxUpcoming" onclick="renderFixtures('upcoming')">Upcoming</div>
     </div>
     <div id="fxList"><div class="muted">No data yet.</div></div>
+  </div>
+
+  <!-- HIGHLIGHTS -->
+  <div class="panel tabpanel hidden" id="tab-highlights">
+    <h2>🎬 Highlights</h2>
+    <div class="legend">Every completed match, newest first. Tap a card to open match highlights on YouTube (opens the official search results in a new tab).</div>
+    <div id="hlList" style="margin-top:10px"><div class="muted">No completed matches yet — highlights appear here once games finish.</div></div>
   </div>
 
   <!-- TIEBREAKERS -->
@@ -398,7 +418,7 @@ function playerTotals(){
 }
 
 /* ---------- rendering ---------- */
-function renderAll(){ renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderActuals(); renderDiag(); renderPredTable(); updateTestButtons(); }
+function renderAll(){ renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderHighlights(); renderActuals(); renderDiag(); renderPredTable(); updateTestButtons(); }
 
 function renderLeaderboard(){
   const rows = playerTotals();
@@ -460,6 +480,29 @@ function renderFixtures(which){
   });
 }
 function ownTag(name){ const c=canonical(name); return c? ` <span class="owner-chip">(${OWNER[c]})</span>`:""; }
+
+function renderHighlights(){
+  const box=$("hlList"); if(!box) return;
+  const fin=FIXTURES.filter(f=>FINISHED.has(f.fixture?.status?.short))
+    .sort((a,b)=> new Date(b.fixture.date)-new Date(a.fixture.date));
+  if(!fin.length){ box.innerHTML='<div class="muted">No completed matches yet — highlights appear here once games finish.</div>'; return; }
+  let html='<div class="hlgrid">';
+  fin.forEach(f=>{
+    const h=f.teams.home.name, a=f.teams.away.name;
+    const q=encodeURIComponent(h+" vs "+a+" World Cup 2026 highlights");
+    const url="https://www.youtube.com/results?search_query="+q;
+    const when=new Date(f.fixture.date).toLocaleDateString();
+    const round=f.league?.round||"";
+    html+=`<a class="hlcard" href="${url}" target="_blank" rel="noopener noreferrer">
+      <span class="hlplay">▶</span>
+      <span class="hlmeta">
+        <div class="hlteams">${h} <span class="hlscore">${f.goals.home}–${f.goals.away}</span> ${a}</div>
+        <div class="hlsub">${when}${round?' · '+round:''}</div>
+      </span></a>`;
+  });
+  html+='</div>';
+  box.innerHTML=html;
+}
 
 /* ---------- tiebreakers (shared storage + lock) ---------- */
 const PRED_FIELDS=[["goals","Goals"],["og","Own goals"],["yel","Yellow cards"],["red","Red cards"]];
