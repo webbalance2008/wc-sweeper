@@ -475,6 +475,17 @@ function renderTeams(){
 }
 
 let currentFx="recent";
+function shortRound(r){
+  if(!r) return "";
+  if(/group/i.test(r)){ const m=r.match(/(\d+)/); return "Group"+(m?" MD"+m[1]:""); }
+  if(/round of 32/i.test(r)) return "R32";
+  if(/round of 16/i.test(r)) return "R16";
+  if(/quarter/i.test(r)) return "QF";
+  if(/semi/i.test(r)) return "SF";
+  if(/3rd|third/i.test(r)) return "3rd place";
+  if(/final/i.test(r)) return "Final";
+  return r;
+}
 function renderFixtures(which){
   currentFx=which||currentFx;
   $("fxRecent").className="tab"+(currentFx==="recent"?" active":"");
@@ -497,7 +508,7 @@ function renderFixtures(which){
     const win = stat==="PEN" ? (f.teams.home.winner===true?"home":f.teams.away.winner===true?"away":"") : "";
     const ownH=ownTag(f.teams.home.name), ownA=ownTag(f.teams.away.name);
     const div=document.createElement("div"); div.className="fx";
-    div.innerHTML=`<span class="when">${when}</span>
+    div.innerHTML=`<span class="when">${when}<div style="font-size:10px;color:var(--accent)">${shortRound(f.league?.round)}</div></span>
       <span style="flex:1;text-align:right${win==="home"?";font-weight:700":""}">${f.teams.home.name}${ownH}${win==="home"?" ✓":""}</span>
       <span class="score">${scoreCell}</span>
       <span style="flex:1${win==="away"?";font-weight:700":""}">${ownA}${f.teams.away.name}${win==="away"?" ✓":""}</span>`;
