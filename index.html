@@ -138,7 +138,11 @@
 
   <!-- LEADERBOARD -->
   <div class="panel tabpanel" id="tab-leaderboard">
-    <h2>🏆 Leaderboard</h2>
+    <div class="row">
+      <h2 style="margin:0">🏆 Leaderboard</h2>
+      <span class="small muted" id="lbUpdated" style="margin-left:auto"></span>
+      <button onclick="loadData(true)">↻ Refresh</button>
+    </div>
     <div class="tablewrap">
     <table id="lbTable">
       <thead><tr>
@@ -161,7 +165,11 @@
 
   <!-- FIXTURES -->
   <div class="panel tabpanel hidden" id="tab-fixtures">
-    <h2>📅 Results &amp; fixtures</h2>
+    <div class="row">
+      <h2 style="margin:0">📅 Results &amp; fixtures</h2>
+      <span class="small muted" id="fxUpdated" style="margin-left:auto"></span>
+      <button onclick="loadData(true)">↻ Refresh</button>
+    </div>
     <div class="row" style="margin-bottom:8px">
       <div class="tab active" id="fxRecent" onclick="renderFixtures('recent')">Recent results</div>
       <div class="tab" id="fxUpcoming" onclick="renderFixtures('upcoming')">Upcoming</div>
@@ -289,6 +297,7 @@ const LS = {
 
 let FIXTURES = [];   // raw fixture objects from API
 let STANDINGS = {};  // canonical team -> {p,w,d,l,gf,ga,pts,out,lastRound}
+let LAST_LOADED = 0; // epoch ms of the data currently shown (cache or fresh fetch)
 
 /* Go-live: no football API requests are made before this moment (saves quota pre-tournament).
    This is also when tiebreaker predictions lock. Kept in sync with the server (functions/api/predictions.js). */
@@ -396,10 +405,12 @@ async function loadData(force){
     let cached = LS.fixtures();
     if(!force && cached && (Date.now()-cached.t < 10*60*1000)){
       FIXTURES = cached.data;
+      LAST_LOADED = cached.t;
       st.innerHTML = '<span class="ok">Loaded from cache ('+new Date(cached.t).toLocaleTimeString()+').</span>';
     } else {
       FIXTURES = await apiGet(`/fixtures?league=${cfg.leagueId}&season=${cfg.season}`);
       LS.setFixtures(FIXTURES);
+      LAST_LOADED = Date.now();
       st.innerHTML = '<span class="ok">Loaded '+FIXTURES.length+' fixtures at '+new Date().toLocaleTimeString()+'.</span>';
     }
     LIVE_START = earliestKickoff(FIXTURES);   // real tournament start, from live schedule
@@ -464,7 +475,15 @@ function playerTotals(){
 }
 
 /* ---------- rendering ---------- */
-function renderAll(){ renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderHighlights(); renderActuals(); renderDiag(); renderPredTable(); updateTestButtons(); }
+function renderUpdated(){
+  let txt;
+  if(TEST_MODE) txt='🧪 test data';
+  else if(Date.now() < GO_LIVE) txt='live results begin 11 Jun 2026';
+  else if(LAST_LOADED) txt='updated '+new Date(LAST_LOADED).toLocaleTimeString();
+  else txt='not loaded yet — tap Refresh';
+  ["lbUpdated","fxUpdated"].forEach(id=>{ const el=$(id); if(el) el.textContent=txt; });
+}
+function renderAll(){ renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderHighlights(); renderActuals(); renderDiag(); renderPredTable(); updateTestButtons(); renderUpdated(); }
 
 function renderLeaderboard(){
   const rows = playerTotals();
@@ -780,6 +799,7 @@ function showTab(t){
   renderPredTable();     // draw the player cards immediately (don't wait on the network)
   loadPredictions();     // then load shared saved values and re-render
   renderActuals();
+  renderUpdated();       // show freshness hint immediately, even before the first load resolves
   if(USE_PROXY || LS.key()) loadData(false);
 })();
 </script>
