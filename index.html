@@ -354,17 +354,27 @@ function loadTestData(){
    accessed via the Pages Function at /api. No key is needed in the browser. */
 const USE_PROXY = true;
 function apiBase(){ return USE_PROXY ? "/api" : "https://v3.football.api-sports.io"; }
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
 async function apiGet(path){
   const key = LS.key();
   if(!USE_PROXY && !key) throw new Error("No API key saved.");
   const headers = USE_PROXY ? {} : {"x-apisports-key":key};
-  const res = await fetch(apiBase()+path,{headers});
-  if(!res.ok) throw new Error("HTTP "+res.status+" "+res.statusText);
-  const j = await res.json();
-  if(j.errors && (Array.isArray(j.errors)? j.errors.length : Object.keys(j.errors).length)){
-    throw new Error(typeof j.errors==="object"? JSON.stringify(j.errors): String(j.errors));
+  // Retry on rate-limit (429), honouring Retry-After, with a short backoff.
+  for(let attempt=0; ; attempt++){
+    const res = await fetch(apiBase()+path,{headers});
+    if(res.status===429){
+      if(attempt>=2) throw new Error("Rate limit hit — try again in a minute.");
+      const ra = parseInt(res.headers.get("retry-after")||"",10);
+      await sleep((ra>0?ra:5*(attempt+1))*1000);
+      continue;
+    }
+    if(!res.ok) throw new Error("HTTP "+res.status+" "+res.statusText);
+    const j = await res.json();
+    if(j.errors && (Array.isArray(j.errors)? j.errors.length : Object.keys(j.errors).length)){
+      throw new Error(typeof j.errors==="object"? JSON.stringify(j.errors): String(j.errors));
+    }
+    return j.response||[];
   }
-  return j.response||[];
 }
 
 async function loadData(force){
@@ -705,6 +715,7 @@ async function computeCardTotals(){
   let og=0,yel=0,red=0,done=0;
   st.textContent=`Reading events 0/${fin.length}…`;
   for(const f of fin){
+    if(done>0) await sleep(1500);   // space out calls so we don't burst past the per-minute limit
     try{
       const ev=await apiGet(`/fixtures/events?fixture=${f.fixture.id}`);
       ev.forEach(e=>{
