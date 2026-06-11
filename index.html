@@ -28,6 +28,9 @@
   input:focus{border-color:var(--accent)}
   button{background:var(--accent);color:#04150c;border:none;border-radius:9px;padding:9px 16px;font-weight:600;cursor:pointer}
   button.secondary{background:transparent;border:1px solid var(--line);color:var(--text)}
+  .livebadge{display:inline-block;font-size:11px;font-weight:700;color:var(--red);white-space:nowrap;animation:livepulse 1.4s ease-in-out infinite}
+  @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.45}}
+  .tname .livedot{color:var(--red);font-size:9px;margin-left:5px;animation:livepulse 1.4s ease-in-out infinite}
   button:disabled{opacity:.5;cursor:not-allowed}
   .muted{color:var(--muted)}
   .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
@@ -154,6 +157,7 @@
     </table>
     </div>
     <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. A penalty-shootout win counts as a full win (3). “Alive” = teams not yet knocked out.</div>
+    <div class="legend" id="lbLiveNote" style="display:none"><span class="livebadge">🔴 LIVE</span> — a match is in progress. Those points are <b>provisional</b> from the current score and will change if the score does; they only lock when the match finishes.</div>
   </div>
 
   <!-- TEAMS -->
@@ -422,13 +426,14 @@ async function loadData(force){
 }
 
 const FINISHED = new Set(["FT","AET","PEN"]);
+const INPLAY = new Set(["1H","HT","2H","ET","BT","P","LIVE"]);   // match currently being played
 
 let UNOWNED = {};   // api team name -> true, for teams in the tournament that nobody drew
 function computeStandings(){
   STANDINGS = {};
   UNOWNED = {};
   // ensure every owned team has a row
-  Object.keys(OWNER).forEach(t=>{ STANDINGS[t]={p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,out:false,lastRound:"",seen:false}; });
+  Object.keys(OWNER).forEach(t=>{ STANDINGS[t]={p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,out:false,lastRound:"",seen:false,live:false,elapsed:null}; });
   const cfg = readCfg();
   FIXTURES.forEach(fx=>{
     const stat = fx.fixture?.status?.short;
@@ -440,21 +445,24 @@ function computeStandings(){
       if(c&&STANDINGS[c]) STANDINGS[c].seen=true;
       else if(nm) UNOWNED[nm]=true;
     });
-    if(!FINISHED.has(stat)) return;
+    const live = INPLAY.has(stat);
+    if(!FINISHED.has(stat) && !live) return;   // skip not-started/postponed; count finished + in-progress
     const gh = fx.goals?.home ?? 0, ga = fx.goals?.away ?? 0;
     const isPen = stat==="PEN";   // shootout: goals level, decided by winner flag
+    const elapsed = fx.fixture?.status?.elapsed ?? null;
     function apply(c, gf, gaa, isWinner){
       if(!c||!STANDINGS[c]) return;
       const s = STANDINGS[c];
       s.p++; s.gf+=gf; s.ga+=gaa; s.lastRound=round;
+      if(live){ s.live=true; s.elapsed=elapsed; }
       let res;
       if(isPen) res = isWinner ? "W" : "L";   // penalty win counts as a full win
-      else if(gf>gaa) res="W";
+      else if(gf>gaa) res="W";                // in-progress: result from the CURRENT score (provisional)
       else if(gf===gaa) res="D";
       else res="L";
       if(res==="W"){ s.w++; s.pts+=cfg.winPts; }
       else if(res==="D"){ s.d++; s.pts+=cfg.drawPts; }
-      else { s.l++; if(isKO) s.out=true; }
+      else { s.l++; if(isKO && !live) s.out=true; }   // not eliminated until the match actually ends
     }
     apply(homeC, gh, ga, fx.teams?.home?.winner===true);
     apply(awayC, ga, gh, fx.teams?.away?.winner===true);
@@ -464,13 +472,14 @@ function computeStandings(){
 function playerTotals(){
   const cfg = readCfg();
   return PLAYERS.map(p=>{
-    let pts=0,w=0,d=0,l=0,gf=0,played=0,alive=0;
+    let pts=0,w=0,d=0,l=0,gf=0,played=0,alive=0,live=0;
     p.teams.forEach(t=>{
       const s=STANDINGS[t]; if(!s) return;
       pts+=s.pts; w+=s.w; d+=s.d; l+=s.l; gf+=s.gf; played+=s.p;
       if(!s.out) alive++;
+      if(s.live) live++;
     });
-    return {name:p.name,pts,w,d,l,gf,played,alive,teams:p.teams};
+    return {name:p.name,pts,w,d,l,gf,played,alive,live,teams:p.teams};
   }).sort((a,b)=> b.pts-a.pts || b.gf-a.gf || b.w-a.w);
 }
 
@@ -489,16 +498,20 @@ function renderLeaderboard(){
   const rows = playerTotals();
   const tb = $("lbBody"); tb.innerHTML="";
   const top = rows.length?rows[0].pts:0;
+  let anyLive=false;
   rows.forEach((r,i)=>{
     const tr=document.createElement("tr");
     if(i===0 && r.pts>0) tr.className="leader";
-    tr.innerHTML=`<td class="rank">${i+1}</td><td>${r.name}${i===0&&r.pts>0?' 👑':''}</td>
+    if(r.live) anyLive=true;
+    const liveBadge = r.live? ` <span class="livebadge" title="${r.live} match${r.live>1?'es':''} in progress — points are provisional">🔴 LIVE</span>`:'';
+    tr.innerHTML=`<td class="rank">${i+1}</td><td>${r.name}${i===0&&r.pts>0?' 👑':''}${liveBadge}</td>
       <td class="num"><span class="ptsbig">${r.pts}</span></td>
       <td class="num">${r.played}</td><td class="num">${r.w}</td><td class="num">${r.d}</td><td class="num">${r.l}</td>
       <td class="num">${r.gf}</td><td class="num">${r.alive}/9</td>`;
     tb.appendChild(tr);
   });
   const cfg=readCfg(); $("lbWin").textContent=cfg.winPts; $("lbDraw").textContent=cfg.drawPts;
+  const ln=$("lbLiveNote"); if(ln) ln.style.display=anyLive?"":"none";
 }
 
 function renderTeams(){
@@ -524,7 +537,8 @@ function renderTeams(){
       } else {
         stat=`<span class="muted small">${s.seen?'yet to play':'—'}</span><span class="tpts">0</span>`;
       }
-      html+=`<div class="teamline"><span class="tname"><span class="trank">${idx+1}</span>${t}</span><span class="tstat">${stat}</span></div>`;
+      const liveDot = s.live? `<span class="livedot" title="Playing now${s.elapsed?` — ${s.elapsed}'`:''}">🔴 ${s.elapsed?s.elapsed+"'":"LIVE"}</span>`:'';
+      html+=`<div class="teamline"><span class="tname"><span class="trank">${idx+1}</span>${t}${liveDot}</span><span class="tstat">${stat}</span></div>`;
     });
     card.innerHTML=html; grid.appendChild(card);
   });
