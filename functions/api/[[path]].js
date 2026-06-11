@@ -67,10 +67,11 @@ export async function onRequestGet(context) {
   if (fresh) return withHeader(fresh, "x-proxy-cache", "HIT");
 
   // 2) Go upstream.
-  let upstreamStatus = 502, body = "", ok = false, rateLimited = false;
+  let upstreamStatus = 502, body = "", ok = false, rateLimited = false, quota = {};
   try {
     const upstream = await fetch(target, { headers: { "x-apisports-key": key } });
     upstreamStatus = upstream.status;
+    quota = readQuota(upstream.headers);   // capture api-sports rate-limit headers for diagnostics
     body = await upstream.text();
     ok = upstream.ok;
     if (ok) {
@@ -86,7 +87,7 @@ export async function onRequestGet(context) {
     const ttl = ttlFor(path);
     const res = new Response(body, {
       status: 200,
-      headers: { "content-type": "application/json", "cache-control": `public, max-age=${ttl}`, "x-proxy-cache": "MISS" },
+      headers: { "content-type": "application/json", "cache-control": `public, max-age=${ttl}`, "x-proxy-cache": "MISS", ...quota },
     });
     context.waitUntil(cache.put(freshKey, res.clone()));
     context.waitUntil(cache.put(staleKey, new Response(body, {
@@ -102,6 +103,7 @@ export async function onRequestGet(context) {
     const r = withHeader(stale, "x-proxy-cache", "STALE");
     r.headers.set("cache-control", "no-store");
     if (rateLimited) r.headers.set("x-ratelimit-hit", "1");   // flag it so the client can log it
+    for (const [k, v] of Object.entries(quota)) r.headers.set(k, v);
     return r;
   }
 
@@ -112,9 +114,21 @@ export async function onRequestGet(context) {
       "content-type": "application/json",
       "cache-control": "no-store",
       "x-proxy-cache": "MISS",
+      ...quota,
       ...(rateLimited ? { "retry-after": "30", "x-ratelimit-hit": "1" } : {}),
     },
   });
+}
+
+// Forward api-sports' rate-limit headers so we can see the per-minute cap and remaining headroom.
+//   x-ratelimit-requests-limit/-remaining = per-DAY ; x-ratelimit-limit/-remaining = per-MINUTE
+function readQuota(h) {
+  const out = {};
+  for (const name of ["x-ratelimit-requests-limit", "x-ratelimit-requests-remaining", "x-ratelimit-limit", "x-ratelimit-remaining"]) {
+    const v = h.get(name);
+    if (v != null) out[name] = v;
+  }
+  return out;
 }
 
 function withHeader(resp, name, value) {
