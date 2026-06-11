@@ -54,7 +54,11 @@ export async function onRequestGet(context) {
 
   const cache = caches.default;
   const freshKey = new Request(url.toString());
+  // Stale ("last known good") key ignores the client's per-minute cache-buster (_m) used for
+  // live matches — so every successful minute refreshes ONE shared stale copy, and a later
+  // rate-limited minute falls back to it (slightly-old events) instead of erroring out.
   const staleUrl = new URL(url.toString());
+  staleUrl.searchParams.delete("_m");
   staleUrl.searchParams.set("__tier", "stale");          // distinct key for the long-lived copy
   const staleKey = new Request(staleUrl.toString());
 
