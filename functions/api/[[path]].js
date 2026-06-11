@@ -97,6 +97,7 @@ export async function onRequestGet(context) {
   if (stale) {
     const r = withHeader(stale, "x-proxy-cache", "STALE");
     r.headers.set("cache-control", "no-store");
+    if (rateLimited) r.headers.set("x-ratelimit-hit", "1");   // flag it so the client can log it
     return r;
   }
 
@@ -107,7 +108,7 @@ export async function onRequestGet(context) {
       "content-type": "application/json",
       "cache-control": "no-store",
       "x-proxy-cache": "MISS",
-      ...(rateLimited ? { "retry-after": "30" } : {}),
+      ...(rateLimited ? { "retry-after": "30", "x-ratelimit-hit": "1" } : {}),
     },
   });
 }

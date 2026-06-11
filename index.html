@@ -243,6 +243,14 @@
     </div>
     <div class="status" id="status">Live results begin 11 Jun 2026 — teams and predictions are ready now.</div>
 
+    <details style="margin-top:16px" id="rateLogBox">
+      <summary>🚦 Rate-limit log <span class="small muted" id="rateLogCount"></span></summary>
+      <div class="legend" style="margin-top:8px">When API-Football's per-minute limit is hit, it's logged here (this browser). <span class="ok">Stale</span> = you still saw recent scores from cache; <span class="err">Error</span> = no cached copy was available. Lots of entries means the shared key is being hit hard at peak.</div>
+      <div class="row" style="margin:8px 0">
+        <button class="secondary" onclick="clearRateLog()">Clear log</button>
+      </div>
+      <div id="rateLog" class="legend"></div>
+    </details>
     <details style="margin-top:16px">
       <summary>🔧 Diagnostics (team-name matching)</summary>
       <div id="diag" class="legend" style="margin-top:10px">Refresh results to check that every owned team is recognised by the API.</div>
@@ -375,6 +383,10 @@ async function apiGet(path){
   // Retry on rate-limit (429), honouring Retry-After, with a short backoff.
   for(let attempt=0; ; attempt++){
     const res = await fetch(apiBase()+path,{headers});
+    // The proxy flags any rate-limit hit (even when it quietly served stale data) — record it.
+    if(res.headers.get("x-ratelimit-hit")){
+      logRateLimit(path, res.headers.get("x-proxy-cache")==="STALE" ? "stale" : "error");
+    }
     if(res.status===429){
       if(attempt>=2) throw new Error("Rate limit hit — try again in a minute.");
       const ra = parseInt(res.headers.get("retry-after")||"",10);
@@ -481,6 +493,33 @@ function playerTotals(){
     });
     return {name:p.name,pts,w,d,l,gf,played,alive,live,teams:p.teams};
   }).sort((a,b)=> b.pts-a.pts || b.gf-a.gf || b.w-a.w);
+}
+
+/* ---------- rate-limit log (this browser, localStorage ring buffer) ---------- */
+const RATELOG_KEY="wc26_ratelog", RATELOG_MAX=50;
+function readRateLog(){ try{ return JSON.parse(localStorage.getItem(RATELOG_KEY)||"[]"); }catch(e){ return []; } }
+function logRateLimit(path, mode){
+  const arr=readRateLog();
+  arr.push({t:Date.now(), path:String(path).replace(/^\//,""), mode});
+  while(arr.length>RATELOG_MAX) arr.shift();
+  try{ localStorage.setItem(RATELOG_KEY, JSON.stringify(arr)); }catch(e){}
+  renderRateLog();
+}
+function clearRateLog(){ try{ localStorage.removeItem(RATELOG_KEY); }catch(e){} renderRateLog(); }
+function renderRateLog(){
+  const box=$("rateLog"); if(!box) return;
+  const arr=readRateLog();
+  const cnt=$("rateLogCount");
+  if(cnt) cnt.textContent = arr.length? "· "+arr.length+" event"+(arr.length>1?"s":"")+(arr.length>=RATELOG_MAX?"+":"") : "· none yet";
+  if(!arr.length){ box.innerHTML='<span class="muted">No rate-limiting seen in this browser yet. 👍</span>'; return; }
+  const rows=arr.slice().reverse().map(e=>{
+    const when=new Date(e.t).toLocaleString();
+    const tag=e.mode==="stale"
+      ? '<span class="ok">stale — scores still shown</span>'
+      : '<span class="err">error — no cached copy</span>';
+    return `<div class="teamline"><span class="tname">${when}</span><span class="tstat">${tag} <span class="muted small">${e.path}</span></span></div>`;
+  }).join("");
+  box.innerHTML=`<div style="margin-top:6px">${rows}</div>`;
 }
 
 /* ---------- rendering ---------- */
@@ -813,6 +852,7 @@ function showTab(t){
   renderPredTable();     // draw the player cards immediately (don't wait on the network)
   loadPredictions();     // then load shared saved values and re-render
   renderActuals();
+  renderRateLog();       // populate the rate-limit log from this browser's history
   renderUpdated();       // show freshness hint immediately, even before the first load resolves
   if(USE_PROXY || LS.key()) loadData(false);
 })();
