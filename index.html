@@ -446,9 +446,42 @@ async function loadData(force){
     computeStandings();
     renderAll();
     tallyCards();   // auto-update card/own-goal totals in the background (incremental + cached)
+    scheduleAutoRefresh();
   }catch(e){
     st.innerHTML = '<span class="err">Error: '+e.message+'</span> — check your key, or that league/season are correct (World Cup = league 1, season 2026).';
+    scheduleAutoRefresh();   // keep retrying even after a cold failure
   }
+}
+
+/* ---------- gentle auto-refresh ----------
+   Polls only when it's worth it: every 60s while a match is live, otherwise it sleeps
+   until ~1 min before the next kickoff (capped at 30 min). Idle overnight and after the
+   final. Rides the same 2-min edge cache + serve-stale, so all players share the upstream
+   call and rate-limit blips just show slightly-stale data. Pauses while the tab is hidden. */
+let _autoTimer=null;
+function anyLive(){ return FIXTURES.some(f=>INPLAY.has(f.fixture?.status?.short)); }
+function nextKickoffMs(){
+  let best=Infinity;
+  FIXTURES.forEach(f=>{ const s=f.fixture?.status?.short;
+    if(s==="NS"||s==="TBD"){ const t=Date.parse(f.fixture?.date); if(!isNaN(t)){ const d=t-Date.now(); if(d>0 && d<best) best=d; } }
+  });
+  return best;
+}
+function scheduleAutoRefresh(){
+  if(_autoTimer){ clearTimeout(_autoTimer); _autoTimer=null; }
+  if(TEST_MODE || Date.now()<GO_LIVE) return;     // not during demo, not before kickoff
+  let delay;
+  if(!FIXTURES.length) delay=60000;               // cold/failed load → keep retrying every 60s
+  else if(anyLive()) delay=60000;                 // a match is live → refresh every 60s
+  else {
+    const nk=nextKickoffMs();
+    if(nk===Infinity) return;                     // nothing left to play → stop polling
+    delay=Math.max(60000, Math.min(nk-60000, 30*60000));   // sleep until ~1 min before next kickoff (60s..30min)
+  }
+  _autoTimer=setTimeout(()=>{
+    if(document.hidden){ scheduleAutoRefresh(); return; }   // don't poll a backgrounded tab; re-check later
+    loadData(true);
+  }, delay);
 }
 
 const FINISHED = new Set(["FT","AET","PEN"]);
@@ -541,7 +574,7 @@ function renderUpdated(){
   let txt;
   if(TEST_MODE) txt='🧪 test data';
   else if(Date.now() < GO_LIVE) txt='live results begin 11 Jun 2026';
-  else if(LAST_LOADED) txt='updated '+new Date(LAST_LOADED).toLocaleTimeString();
+  else if(LAST_LOADED) txt=(anyLive()?'🔴 live · ':'')+'updated '+new Date(LAST_LOADED).toLocaleTimeString()+(anyLive()?' · auto':'');
   else txt='not loaded yet — tap Refresh';
   ["lbUpdated","fxUpdated"].forEach(id=>{ const el=$(id); if(el) el.textContent=txt; });
 }
@@ -895,6 +928,8 @@ function showTab(t){
   renderRateLog();       // populate the rate-limit log from this browser's history
   renderUpdated();       // show freshness hint immediately, even before the first load resolves
   if(USE_PROXY || LS.key()) loadData(false);
+  // when the user comes back to the tab, refresh immediately (auto-refresh pauses while hidden)
+  document.addEventListener("visibilitychange",()=>{ if(!document.hidden && !TEST_MODE && Date.now()>=GO_LIVE) loadData(true); });
 })();
 </script>
 </body>
