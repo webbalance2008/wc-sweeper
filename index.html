@@ -827,8 +827,8 @@ const ACT={goals:0,og:null,yel:null,red:null};
 /* Card/own-goal tally — runs AUTOMATICALLY after each load, no button press needed.
    Each match's events are read once and cached per-fixture in localStorage, so repeat
    loads cost nothing; only live matches (and a match that has just finished) are re-read. */
-const EVCACHE_KEY="wc26_evcache";
-function readEvCache(){ try{ return JSON.parse(localStorage.getItem(EVCACHE_KEY)||"{}"); }catch(e){ return {}; } }
+const EVCACHE_KEY="wc26_evcache2";   // v2: v1 could freeze a stale (rate-limited) count as final — discard it
+function readEvCache(){ try{ localStorage.removeItem("wc26_evcache"); return JSON.parse(localStorage.getItem(EVCACHE_KEY)||"{}"); }catch(e){ return {}; } }
 function writeEvCache(o){ try{ localStorage.setItem(EVCACHE_KEY, JSON.stringify(o)); }catch(e){} }
 function setCardActuals(){ $("actOG").textContent=ACT.og??"–"; $("actYel").textContent=ACT.yel??"–"; $("actRed").textContent=ACT.red??"–"; }
 
@@ -846,7 +846,8 @@ async function tallyCards(){
     const ids=fin.map(f=>String(f.fixture.id));
     const liveN=fin.filter(f=>INPLAY.has(f.fixture?.status?.short)).length;
     const minuteBucket=Math.floor(Date.now()/60000);
-    const needs=f=>{ const id=String(f.fixture.id), s=f.fixture?.status?.short, c=cache[id]; return INPLAY.has(s)||!c||c.st!==s; };
+    // re-read if: live, never read, status changed, OR the cached count came from a stale (rate-limited) serve
+    const needs=f=>{ const id=String(f.fixture.id), s=f.fixture?.status?.short, c=cache[id]; return INPLAY.has(s)||!c||c.st!==s||c.stale; };
     const pending=fin.filter(needs).length;
     let done=0;
     if(st && pending) st.textContent=`Updating card totals… 0/${pending}`;
@@ -861,7 +862,8 @@ async function tallyCards(){
           if(type==="goal" && detail.includes("own")) og++;
           if(type==="card" && detail.includes("yellow") && !detail.includes("second")) yel++;
           if(type==="card" && (detail.includes("red")||detail.includes("second yellow"))) red++; });
-        cache[String(f.fixture.id)]={og,yel,red,st:s};
+        // mark stale-sourced reads so we keep re-fetching until a fresh copy confirms the final count
+        cache[String(f.fixture.id)]={og,yel,red,st:s,stale:(LAST_CACHE==="STALE")};
         done++; if(st) st.textContent=`Updating card totals… ${done}/${pending}`;
         if(LAST_CACHE!=="HIT") await sleep(1200);   // pace only real upstream calls; cached reads are free
       }catch(e){ /* keep any previous cached count; serve-stale usually prevents reaching here */ }
