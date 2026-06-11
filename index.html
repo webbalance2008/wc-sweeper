@@ -216,6 +216,7 @@
         <div class="af">Yellow cards<b id="actYel">–</b></div>
         <div class="af">Red cards<b id="actRed">–</b></div>
       </div>
+      <div class="small" id="actLiveNote" style="display:none;margin-top:8px;color:var(--red)"></div>
     </div>
     <div class="row" style="margin-top:12px">
       <button class="secondary" id="btnCompute" onclick="computeCardTotals()" style="display:none">Tally cards &amp; own goals (for tiebreak)</button>
@@ -765,31 +766,40 @@ async function savePlayer(name){
   }catch(e){ if(stat) stat.innerHTML='<span class="err">network error</span>'; }
 }
 function renderActuals(){
-  // total goals from finished fixtures (cheap)
-  let g=0,finished=0;
-  FIXTURES.forEach(f=>{ if(FINISHED.has(f.fixture?.status?.short)){ g+=(f.goals.home||0)+(f.goals.away||0); finished++; } });
-  $("actGoals").textContent = finished? g : "0";
+  // total goals from finished + in-progress fixtures (live games count provisionally)
+  let g=0,counted=0,live=0;
+  FIXTURES.forEach(f=>{ const st=f.fixture?.status?.short;
+    if(FINISHED.has(st)||INPLAY.has(st)){ g+=(f.goals.home||0)+(f.goals.away||0); counted++; if(INPLAY.has(st)) live++; }
+  });
+  $("actGoals").textContent = counted? g : "0";
   ACT.goals=g;
+  const ln=$("actLiveNote"); if(ln){ ln.style.display=live?"":"none"; ln.innerHTML='🔴 includes '+live+' live match'+(live>1?'es':'')+' — goals update as they\'re scored; press Tally to refresh cards.'; }
   renderCloseness();
 }
 const ACT={goals:0,og:null,yel:null,red:null};
 async function computeCardTotals(){
   const st=$("tbStatus");
-  const fin=FIXTURES.filter(f=>FINISHED.has(f.fixture?.status?.short));
-  if(!fin.length){ st.innerHTML='<span class="muted">No finished matches yet.</span>'; return; }
+  // include finished AND in-progress matches, so live cards (e.g. a red card mid-match) count
+  const fin=FIXTURES.filter(f=>{ const s=f.fixture?.status?.short; return FINISHED.has(s)||INPLAY.has(s); });
+  const liveN=fin.filter(f=>INPLAY.has(f.fixture?.status?.short)).length;
+  if(!fin.length){ st.innerHTML='<span class="muted">No matches under way yet.</span>'; return; }
   if(TEST_MODE){
     ACT.og=rnd(13); ACT.yel=180+rnd(200); ACT.red=rnd(11);
     $("actOG").textContent=ACT.og; $("actYel").textContent=ACT.yel; $("actRed").textContent=ACT.red;
     st.innerHTML='<span style="color:var(--gold)">🧪 Test totals — own goals '+ACT.og+', yellows '+ACT.yel+', reds '+ACT.red+'.</span>';
     renderCloseness(); return;
   }
-  if(!confirm(`This reads events for ${fin.length} finished match(es) — about ${fin.length} API calls. Continue?`)) return;
+  const liveTxt = liveN? ` (incl. ${liveN} live)`:'';
+  if(!confirm(`This reads events for ${fin.length} match(es)${liveTxt} — about ${fin.length} API calls. Continue?`)) return;
   let og=0,yel=0,red=0,done=0;
   st.textContent=`Reading events 0/${fin.length}…`;
+  const minuteBucket=Math.floor(Date.now()/60000);
   for(const f of fin){
     if(done>0) await sleep(1500);   // space out calls so we don't burst past the per-minute limit
     try{
-      const ev=await apiGet(`/fixtures/events?fixture=${f.fixture.id}`);
+      const live=INPLAY.has(f.fixture?.status?.short);
+      // live matches: bypass the proxy's 1h events cache with a per-minute key so new cards show
+      const ev=await apiGet(`/fixtures/events?fixture=${f.fixture.id}`+(live?`&_m=${minuteBucket}`:``));
       ev.forEach(e=>{
         const type=(e.type||"").toLowerCase(), detail=(e.detail||"").toLowerCase();
         if(type==="goal" && detail.includes("own")) og++;
@@ -801,7 +811,8 @@ async function computeCardTotals(){
   }
   ACT.og=og; ACT.yel=yel; ACT.red=red;
   $("actOG").textContent=og; $("actYel").textContent=yel; $("actRed").textContent=red;
-  st.innerHTML=`<span class="ok">Done. Own goals ${og}, yellows ${yel}, reds ${red}.</span>`;
+  const prov = liveN? ` <span class="small">🔴 provisional — ${liveN} match still live; press again to update.</span>`:'';
+  st.innerHTML=`<span class="ok">Done. Own goals ${og}, yellows ${yel}, reds ${red}.</span>${prov}`;
   renderCloseness();
 }
 function renderCloseness(){
