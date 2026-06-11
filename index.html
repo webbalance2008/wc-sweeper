@@ -219,10 +219,10 @@
       <div class="small" id="actLiveNote" style="display:none;margin-top:8px;color:var(--red)"></div>
     </div>
     <div class="row" style="margin-top:12px">
-      <button class="secondary" id="btnCompute" onclick="computeCardTotals()" style="display:none">Tally cards &amp; own goals (for tiebreak)</button>
+      <button class="secondary" id="btnCompute" onclick="computeCardTotals()" style="display:none">↻ Update card totals now</button>
     </div>
     <div class="status" id="tbStatus"></div>
-    <div class="legend">Total goals is pulled automatically from match scores. Cards &amp; own goals require reading each finished match's events (≈1 API call per match), so it runs only when you press the button. Closest prediction to the final actual wins the tiebreak.</div>
+    <div class="legend">Goals, own goals, yellow and red cards all update <b>automatically</b> whenever results refresh — no button needed. Each match's events are read once and cached, so it's cheap; live matches refresh as they go. Use the button only to pull the very latest mid-match. Closest prediction to the final actual wins the tiebreak.</div>
     <div id="closeness" style="margin-top:10px"></div>
   </div>
 
@@ -377,6 +377,7 @@ function loadTestData(){
 const USE_PROXY = true;
 function apiBase(){ return USE_PROXY ? "/api" : "https://v3.football.api-sports.io"; }
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
+let LAST_CACHE = null;   // x-proxy-cache of the most recent apiGet (HIT / MISS / STALE) — lets callers pace only real upstream calls
 async function apiGet(path){
   const key = LS.key();
   if(!USE_PROXY && !key) throw new Error("No API key saved.");
@@ -384,6 +385,7 @@ async function apiGet(path){
   // Retry on rate-limit (429), honouring Retry-After, with a short backoff.
   for(let attempt=0; ; attempt++){
     const res = await fetch(apiBase()+path,{headers});
+    LAST_CACHE = res.headers.get("x-proxy-cache");
     // The proxy flags any rate-limit hit (even when it quietly served stale data) — record it.
     if(res.headers.get("x-ratelimit-hit")){
       logRateLimit(path, res.headers.get("x-proxy-cache")==="STALE" ? "stale" : "error");
@@ -433,6 +435,7 @@ async function loadData(force){
     LIVE_START = earliestKickoff(FIXTURES);   // real tournament start, from live schedule
     computeStandings();
     renderAll();
+    tallyCards();   // auto-update card/own-goal totals in the background (incremental + cached)
   }catch(e){
     st.innerHTML = '<span class="err">Error: '+e.message+'</span> — check your key, or that league/season are correct (World Cup = league 1, season 2026).';
   }
@@ -773,48 +776,64 @@ function renderActuals(){
   });
   $("actGoals").textContent = counted? g : "0";
   ACT.goals=g;
-  const ln=$("actLiveNote"); if(ln){ ln.style.display=live?"":"none"; ln.innerHTML='🔴 includes '+live+' live match'+(live>1?'es':'')+' — goals update as they\'re scored; press Tally to refresh cards.'; }
+  const ln=$("actLiveNote"); if(ln){ ln.style.display=live?"":"none"; ln.innerHTML='🔴 includes '+live+' live match'+(live>1?'es':'')+' — totals update automatically each refresh.'; }
   renderCloseness();
 }
 const ACT={goals:0,og:null,yel:null,red:null};
-async function computeCardTotals(){
+
+/* Card/own-goal tally — runs AUTOMATICALLY after each load, no button press needed.
+   Each match's events are read once and cached per-fixture in localStorage, so repeat
+   loads cost nothing; only live matches (and a match that has just finished) are re-read. */
+const EVCACHE_KEY="wc26_evcache";
+function readEvCache(){ try{ return JSON.parse(localStorage.getItem(EVCACHE_KEY)||"{}"); }catch(e){ return {}; } }
+function writeEvCache(o){ try{ localStorage.setItem(EVCACHE_KEY, JSON.stringify(o)); }catch(e){} }
+function setCardActuals(){ $("actOG").textContent=ACT.og??"–"; $("actYel").textContent=ACT.yel??"–"; $("actRed").textContent=ACT.red??"–"; }
+
+let _tallying=false;
+async function tallyCards(){
+  if(TEST_MODE) return;            // test data fills the totals itself
+  if(_tallying) return;            // don't overlap concurrent runs
   const st=$("tbStatus");
-  // include finished AND in-progress matches, so live cards (e.g. a red card mid-match) count
+  // finished AND in-progress matches, so live cards (e.g. a red card mid-match) count
   const fin=FIXTURES.filter(f=>{ const s=f.fixture?.status?.short; return FINISHED.has(s)||INPLAY.has(s); });
-  const liveN=fin.filter(f=>INPLAY.has(f.fixture?.status?.short)).length;
-  if(!fin.length){ st.innerHTML='<span class="muted">No matches under way yet.</span>'; return; }
-  if(TEST_MODE){
-    ACT.og=rnd(13); ACT.yel=180+rnd(200); ACT.red=rnd(11);
-    $("actOG").textContent=ACT.og; $("actYel").textContent=ACT.yel; $("actRed").textContent=ACT.red;
-    st.innerHTML='<span style="color:var(--gold)">🧪 Test totals — own goals '+ACT.og+', yellows '+ACT.yel+', reds '+ACT.red+'.</span>';
-    renderCloseness(); return;
-  }
-  const liveTxt = liveN? ` (incl. ${liveN} live)`:'';
-  if(!confirm(`This reads events for ${fin.length} match(es)${liveTxt} — about ${fin.length} API calls. Continue?`)) return;
-  let og=0,yel=0,red=0,done=0;
-  st.textContent=`Reading events 0/${fin.length}…`;
-  const minuteBucket=Math.floor(Date.now()/60000);
-  for(const f of fin){
-    if(done>0) await sleep(1500);   // space out calls so we don't burst past the per-minute limit
-    try{
-      const live=INPLAY.has(f.fixture?.status?.short);
-      // live matches: bypass the proxy's 1h events cache with a per-minute key so new cards show
-      const ev=await apiGet(`/fixtures/events?fixture=${f.fixture.id}`+(live?`&_m=${minuteBucket}`:``));
-      ev.forEach(e=>{
-        const type=(e.type||"").toLowerCase(), detail=(e.detail||"").toLowerCase();
-        if(type==="goal" && detail.includes("own")) og++;
-        if(type==="card" && detail.includes("yellow") && !detail.includes("second")) yel++;
-        if(type==="card" && (detail.includes("red")||detail.includes("second yellow"))) red++;
-      });
-    }catch(e){ /* skip individual errors */ }
-    done++; st.textContent=`Reading events ${done}/${fin.length}…`;
-  }
-  ACT.og=og; ACT.yel=yel; ACT.red=red;
-  $("actOG").textContent=og; $("actYel").textContent=yel; $("actRed").textContent=red;
-  const prov = liveN? ` <span class="small">🔴 provisional — ${liveN} match still live; press again to update.</span>`:'';
-  st.innerHTML=`<span class="ok">Done. Own goals ${og}, yellows ${yel}, reds ${red}.</span>${prov}`;
-  renderCloseness();
+  if(!fin.length){ ACT.og=ACT.yel=ACT.red=null; setCardActuals(); if(st) st.innerHTML='<span class="muted">Card totals will appear automatically once matches start.</span>'; renderCloseness(); return; }
+  _tallying=true;
+  try{
+    const cache=readEvCache();
+    const ids=fin.map(f=>String(f.fixture.id));
+    const liveN=fin.filter(f=>INPLAY.has(f.fixture?.status?.short)).length;
+    const minuteBucket=Math.floor(Date.now()/60000);
+    const needs=f=>{ const id=String(f.fixture.id), s=f.fixture?.status?.short, c=cache[id]; return INPLAY.has(s)||!c||c.st!==s; };
+    const pending=fin.filter(needs).length;
+    let done=0;
+    if(st && pending) st.textContent=`Updating card totals… 0/${pending}`;
+    for(const f of fin){
+      if(!needs(f)) continue;      // already read while in this status — reuse the cached count
+      const s=f.fixture?.status?.short, live=INPLAY.has(s);
+      try{
+        // live matches bypass the proxy's 1h events cache with a per-minute key so new cards show
+        const ev=await apiGet(`/fixtures/events?fixture=${f.fixture.id}`+(live?`&_m=${minuteBucket}`:``));
+        let og=0,yel=0,red=0;
+        ev.forEach(e=>{ const type=(e.type||"").toLowerCase(), detail=(e.detail||"").toLowerCase();
+          if(type==="goal" && detail.includes("own")) og++;
+          if(type==="card" && detail.includes("yellow") && !detail.includes("second")) yel++;
+          if(type==="card" && (detail.includes("red")||detail.includes("second yellow"))) red++; });
+        cache[String(f.fixture.id)]={og,yel,red,st:s};
+        done++; if(st) st.textContent=`Updating card totals… ${done}/${pending}`;
+        if(LAST_CACHE!=="HIT") await sleep(1200);   // pace only real upstream calls; cached reads are free
+      }catch(e){ /* keep any previous cached count; serve-stale usually prevents reaching here */ }
+    }
+    writeEvCache(cache);
+    let og=0,yel=0,red=0,have=0;
+    ids.forEach(id=>{ const c=cache[id]; if(c){ og+=c.og; yel+=c.yel; red+=c.red; have++; } });
+    if(have){ ACT.og=og; ACT.yel=yel; ACT.red=red; }
+    setCardActuals();
+    if(st){ const prov=liveN?` <span class="small">🔴 ${liveN} live — refreshes automatically.</span>`:''; st.innerHTML=`<span class="ok">Card totals: own goals ${og}, yellows ${yel}, reds ${red}.</span>${prov}`; }
+    renderCloseness();
+  } finally { _tallying=false; }
 }
+// the manual button just triggers the same incremental tally (e.g. to pull the latest live cards now)
+function computeCardTotals(){ return tallyCards(); }
 function renderCloseness(){
   const pred=PRED; const box=$("closeness");
   const fields=[["goals","Goals",ACT.goals],["og","Own goals",ACT.og],["yel","Yellow cards",ACT.yel],["red","Red cards",ACT.red]];
