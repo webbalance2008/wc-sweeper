@@ -427,10 +427,20 @@ async function loadData(force){
       LAST_LOADED = cached.t;
       st.innerHTML = '<span class="ok">Loaded from cache ('+new Date(cached.t).toLocaleTimeString()+').</span>';
     } else {
-      FIXTURES = await apiGet(`/fixtures?league=${cfg.leagueId}&season=${cfg.season}`);
-      LS.setFixtures(FIXTURES);
-      LAST_LOADED = Date.now();
-      st.innerHTML = '<span class="ok">Loaded '+FIXTURES.length+' fixtures at '+new Date().toLocaleTimeString()+'.</span>';
+      try{
+        FIXTURES = await apiGet(`/fixtures?league=${cfg.leagueId}&season=${cfg.season}`);
+        LS.setFixtures(FIXTURES);
+        LAST_LOADED = Date.now();
+        st.innerHTML = '<span class="ok">Loaded '+FIXTURES.length+' fixtures at '+new Date().toLocaleTimeString()+'.</span>';
+      }catch(err){
+        // Couldn't refresh (e.g. rate-limited with no edge-stale). Fall back to the last saved
+        // copy of any age rather than showing nothing — stale scores beat an error.
+        if(cached && cached.data){
+          FIXTURES = cached.data;
+          LAST_LOADED = cached.t;
+          st.innerHTML = '<span class="muted">⚠️ Couldn’t refresh just now — showing last data from '+new Date(cached.t).toLocaleTimeString()+'. Will retry on next refresh.</span>';
+        } else { throw err; }   // nothing saved yet (very first load) — surface the error
+      }
     }
     LIVE_START = earliestKickoff(FIXTURES);   // real tournament start, from live schedule
     computeStandings();
