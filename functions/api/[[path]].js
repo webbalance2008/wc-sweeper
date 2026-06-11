@@ -4,71 +4,120 @@
 // Set the key in Cloudflare → Pages project → Settings → Variables and Secrets:
 //   Name: API_FOOTBALL_KEY   Type: Secret
 //
-// Quota protection: the upstream key is SHARED by every player's browser, so without
-// caching, 5 players × every refresh all count against one per-minute / per-day limit.
-// We cache successful upstream responses at the Cloudflare edge (Cache API) keyed by the
-// request URL, so identical requests from any player are served without touching upstream
-// for the TTL window. Errors (429, 5xx, etc.) are never cached.
+// Quota protection: the upstream key is SHARED by every player's browser. The Pro plan's
+// per-DAY budget is generous, but the per-MINUTE limit is hit in bursts at peak (everyone
+// opening the page around kickoff). Two layers guard against that:
+//   1. Fresh cache — successful responses are cached at the edge (Cache API) keyed by URL,
+//      so identical requests from any player are served without touching upstream for the TTL.
+//   2. Serve-stale-on-error — every success is ALSO kept as a long-lived "last known good"
+//      copy. If upstream is rate-limited (or 5xx) and we have a prior good copy, we serve
+//      that stale copy instead of an error, so players see slightly-old scores, never a red
+//      error. Error responses are NEVER cached (no poisoning a 200-with-errors body).
+//
+// IMPORTANT: api-sports returns rate-limit errors as HTTP 200 with {"errors":{"rateLimit":..}},
+// not a 429 — so we must inspect the body, not just the status code.
 const UPSTREAM = "https://v3.football.api-sports.io";
 
 // How long to reuse a cached upstream response, by endpoint.
 function ttlFor(path) {
-  // Events for a finished match never change — cache them hard.
-  if (path.startsWith("fixtures/events")) return 3600;     // 1 hour
-  // Fixtures/scores update during live play — fresh-ish but still shared across players.
-  if (path.startsWith("fixtures")) return 120;             // 2 minutes
+  if (path.startsWith("fixtures/events")) return 3600;     // events of a finished match never change
+  if (path.startsWith("fixtures")) return 120;             // scores update during live play
   return 120;
+}
+const STALE_TTL = 86400;   // 1 day: how long a "last known good" copy is kept for fallback
+
+// Does a parsed api-sports body carry a non-empty errors payload?
+function bodyError(body) {
+  try {
+    const j = JSON.parse(body);
+    const e = j && j.errors;
+    const has = e && (Array.isArray(e) ? e.length : Object.keys(e).length);
+    if (!has) return null;
+    const txt = JSON.stringify(e).toLowerCase();
+    const rateLimited = !!e.rateLimit || txt.includes("too many request") || txt.includes("ratelimit");
+    return { rateLimited };
+  } catch (_) {
+    return null;   // non-JSON 2xx (unlikely) — treat as a normal success
+  }
 }
 
 export async function onRequestGet(context) {
-  const { request, env, params } = context;
+  const { request, env } = context;
   const key = env.API_FOOTBALL_KEY;
   if (!key) {
     return json({ errors: { config: "API_FOOTBALL_KEY secret is not set on this Pages project." } }, 500);
   }
 
-  // Build the upstream path from the catch-all segments + original query string.
-  const segs = Array.isArray(params.path) ? params.path : (params.path ? [params.path] : []);
-  const path = segs.map(encodeURIComponent).join("/");
-  const search = new URL(request.url).search;
-  const target = `${UPSTREAM}/${path}${search}`;
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/^\/api\/?/, "");   // strip the /api/ prefix
+  const target = `${UPSTREAM}/${path}${url.search}`;
 
-  // Shared edge cache, keyed by the public request URL (same for every player).
   const cache = caches.default;
-  const cacheKey = new Request(new URL(request.url).toString(), { method: "GET" });
+  const freshKey = new Request(url.toString());
+  const staleUrl = new URL(url.toString());
+  staleUrl.searchParams.set("__tier", "stale");          // distinct key for the long-lived copy
+  const staleKey = new Request(staleUrl.toString());
 
-  const hit = await cache.match(cacheKey);
-  if (hit) {
-    const r = new Response(hit.body, hit);
-    r.headers.set("x-proxy-cache", "HIT");
+  // 1) Fresh edge-cache hit — serve immediately, no upstream call.
+  const fresh = await cache.match(freshKey);
+  if (fresh) return withHeader(fresh, "x-proxy-cache", "HIT");
+
+  // 2) Go upstream.
+  let upstreamStatus = 502, body = "", ok = false, rateLimited = false;
+  try {
+    const upstream = await fetch(target, { headers: { "x-apisports-key": key } });
+    upstreamStatus = upstream.status;
+    body = await upstream.text();
+    ok = upstream.ok;
+    if (ok) {
+      const err = bodyError(body);   // a 200 may still carry an errors payload
+      if (err) { ok = false; rateLimited = err.rateLimited; }
+    }
+  } catch (e) {
+    body = JSON.stringify({ errors: { upstream: String(e) } });
+  }
+
+  // 3) Success — cache fresh + refresh the long-lived stale copy, then serve.
+  if (ok) {
+    const ttl = ttlFor(path);
+    const res = new Response(body, {
+      status: 200,
+      headers: { "content-type": "application/json", "cache-control": `public, max-age=${ttl}`, "x-proxy-cache": "MISS" },
+    });
+    context.waitUntil(cache.put(freshKey, res.clone()));
+    context.waitUntil(cache.put(staleKey, new Response(body, {
+      status: 200,
+      headers: { "content-type": "application/json", "cache-control": `public, max-age=${STALE_TTL}` },
+    })));
+    return res;
+  }
+
+  // 4) Upstream errored — serve last-known-good if we have one (never show a red error during a spike).
+  const stale = await cache.match(staleKey);
+  if (stale) {
+    const r = withHeader(stale, "x-proxy-cache", "STALE");
+    r.headers.set("cache-control", "no-store");
     return r;
   }
 
-  let upstream;
-  try {
-    upstream = await fetch(target, { headers: { "x-apisports-key": key } });
-  } catch (e) {
-    return json({ errors: { upstream: String(e) } }, 502);
-  }
-
-  const body = await upstream.text();
-  const ttl = upstream.ok ? ttlFor(path) : 0;   // only cache successful responses
-  const res = new Response(body, {
-    status: upstream.status,
+  // 5) No stale copy — pass the error through, NEVER cached. 429 + Retry-After so clients back off.
+  return new Response(body || "{}", {
+    status: rateLimited ? 429 : upstreamStatus,
     headers: {
-      "content-type": upstream.headers.get("content-type") || "application/json",
-      "cache-control": ttl ? `public, max-age=${ttl}` : "no-store",
+      "content-type": "application/json",
+      "cache-control": "no-store",
       "x-proxy-cache": "MISS",
+      ...(rateLimited ? { "retry-after": "30" } : {}),
     },
   });
+}
 
-  if (ttl) context.waitUntil(cache.put(cacheKey, res.clone()));
-  return res;
+function withHeader(resp, name, value) {
+  const r = new Response(resp.body, resp);
+  r.headers.set(name, value);
+  return r;
 }
 
 function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
+  return new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
 }
