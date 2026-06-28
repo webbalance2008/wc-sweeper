@@ -37,6 +37,12 @@
   .livescore .lteam{flex:1;font-weight:600;font-size:16px}
   .livescore .lteam.away{text-align:right}
   .livescore .lsc{font-size:28px;font-weight:800;color:var(--gold);white-space:nowrap;letter-spacing:1px}
+  .liveevents{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
+  .lev{display:flex;align-items:baseline;gap:8px;font-size:13px}
+  .lev .levmin{color:var(--muted);min-width:34px;font-variant-numeric:tabular-nums}
+  .lev .levicon{font-size:12px}
+  .lev .levwho{flex:1}
+  .lev .levteam{color:var(--muted)}
   .teamline.isout .tname{opacity:.5;text-decoration:line-through}
   .outbadge{display:inline-block;font-size:9px;font-weight:700;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;text-decoration:none}
   button:disabled{opacity:.5;cursor:not-allowed}
@@ -695,6 +701,20 @@ function liveStatusLabel(short, elapsed){
     default:   return short;
   }
 }
+// Pull displayable goals + cards out of a raw events array, sorted by minute.
+function matchEvents(ev){
+  return (ev||[]).filter(e=>{
+    const t=(e.type||"").toLowerCase(), d=(e.detail||"").toLowerCase();
+    if(t==="goal") return !d.includes("missed");   // ignore missed penalties
+    return t==="card";
+  }).map(e=>{
+    const t=(e.type||"").toLowerCase(), d=(e.detail||"").toLowerCase();
+    let icon, extra="";
+    if(t==="goal"){ icon="⚽"; if(d.includes("own")) extra=" (OG)"; else if(d.includes("penalty")) extra=" (pen)"; }
+    else icon = (d.includes("red")||d.includes("second yellow")) ? "🟥" : "🟨";
+    return { min:e.time?.elapsed??0, ex:e.time?.extra??0, icon, extra, player:e.player?.name||"—", team:e.team?.name||"" };
+  }).sort((x,y)=> (x.min-y.min) || (x.ex-y.ex));
+}
 function renderLive(){
   const live=FIXTURES.filter(f=>INPLAY.has(f.fixture?.status?.short))
     .sort((a,b)=>(b.fixture.status.elapsed||0)-(a.fixture.status.elapsed||0));
@@ -712,6 +732,15 @@ function renderLive(){
   box.innerHTML = live.map(f=>{
     const st=f.fixture.status, lbl=liveStatusLabel(st.short, st.elapsed);
     const h=f.teams.home, a=f.teams.away;
+    const evs=matchEvents(EVENTS[String(f.fixture.id)]);
+    let timeline;
+    if(evs.length){
+      timeline='<div class="liveevents">'+evs.map(e=>
+        `<div class="lev"><span class="levmin">${e.min}${e.ex?"+"+e.ex:""}'</span><span class="levicon">${e.icon}</span><span class="levwho">${e.player}${e.extra}<span class="levteam"> · ${e.team}</span></span></div>`
+      ).join("")+'</div>';
+    } else {
+      timeline='<div class="liveevents muted small">No goals or cards yet'+(EVENTS[String(f.fixture.id)]?'.':' (loading…)')+'</div>';
+    }
     return `<div class="livecard">
       <div class="row" style="justify-content:space-between;align-items:center">
         <span class="small" style="color:var(--accent)">${shortRound(f.league?.round)}</span>
@@ -722,6 +751,7 @@ function renderLive(){
         <span class="lsc">${f.goals.home??0}–${f.goals.away??0}</span>
         <span class="lteam away">${a.name}${ownTag(a.name)}</span>
       </div>
+      ${timeline}
     </div>`;
   }).join("");
 }
@@ -908,6 +938,7 @@ const ACT={goals:0,og:null,yel:null,red:null};
 /* Card/own-goal tally — runs AUTOMATICALLY after each load, no button press needed.
    Each match's events are read once and cached per-fixture in localStorage, so repeat
    loads cost nothing; only live matches (and a match that has just finished) are re-read. */
+const EVENTS={};   // fixtureId -> raw events array (goals + cards), kept in memory for the Live tab
 const EVCACHE_KEY="wc26_evcache2";   // v2: v1 could freeze a stale (rate-limited) count as final — discard it
 function readEvCache(){ try{ localStorage.removeItem("wc26_evcache"); return JSON.parse(localStorage.getItem(EVCACHE_KEY)||"{}"); }catch(e){ return {}; } }
 function writeEvCache(o){ try{ localStorage.setItem(EVCACHE_KEY, JSON.stringify(o)); }catch(e){} }
@@ -945,6 +976,7 @@ async function tallyCards(){
           if(type==="card" && (detail.includes("red")||detail.includes("second yellow"))) red++; });
         // mark stale-sourced reads so we keep re-fetching until a fresh copy confirms the final count
         cache[String(f.fixture.id)]={og,yel,red,st:s,stale:(LAST_CACHE==="STALE")};
+        EVENTS[String(f.fixture.id)]=ev;   // keep full event detail (scorers, cards) for the Live tab
         done++; if(st) st.textContent=`Updating card totals… ${done}/${pending}`;
         if(LAST_CACHE!=="HIT") await sleep(1200);   // pace only real upstream calls; cached reads are free
       }catch(e){ /* keep any previous cached count; serve-stale usually prevents reaching here */ }
@@ -956,6 +988,7 @@ async function tallyCards(){
     setCardActuals();
     if(st){ const prov=liveN?` <span class="small">🔴 ${liveN} live — refreshes automatically.</span>`:''; st.innerHTML=`<span class="ok">Card totals: own goals ${og}, yellows ${yel}, reds ${red}.</span>${prov}`; }
     renderCloseness();
+    renderLive();   // live cards now have scorer/card detail to show
   } finally { _tallying=false; }
 }
 // the manual button just triggers the same incremental tally (e.g. to pull the latest live cards now)
