@@ -31,6 +31,8 @@
   .livebadge{display:inline-block;font-size:11px;font-weight:700;color:var(--red);white-space:nowrap;animation:livepulse 1.4s ease-in-out infinite}
   @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.45}}
   .tname .livedot{color:var(--red);font-size:9px;margin-left:5px;animation:livepulse 1.4s ease-in-out infinite}
+  .teamline.isout .tname{opacity:.5;text-decoration:line-through}
+  .outbadge{display:inline-block;font-size:9px;font-weight:700;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;text-decoration:none}
   button:disabled{opacity:.5;cursor:not-allowed}
   .muted{color:var(--muted)}
   .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
@@ -526,8 +528,22 @@ function computeStandings(){
     apply(homeC, gh, ga, fx.teams?.home?.winner===true);
     apply(awayC, ga, gh, fx.teams?.away?.winner===true);
   });
+
+  // Knock-out / elimination: a team is "alive" only if it still appears in a fixture that
+  // isn't finished (an upcoming or in-progress match). This captures group-stage non-qualifiers
+  // and knockout losers alike — once the next round is drawn, eliminated teams have no fixture
+  // left. Applied only once the tournament is under way, so nothing shows out before kickoff.
+  const anyFinished = FIXTURES.some(f=>FINISHED.has(f.fixture?.status?.short));
+  if(anyFinished){
+    const hasFuture={};
+    FIXTURES.forEach(f=>{ if(!FINISHED.has(f.fixture?.status?.short)){
+      [f.teams?.home?.name, f.teams?.away?.name].forEach(nm=>{ const c=canonical(nm); if(c&&STANDINGS[c]) hasFuture[c]=true; });
+    }});
+    Object.keys(STANDINGS).forEach(t=>{ const s=STANDINGS[t]; if(!s.live && !hasFuture[t]) s.out=true; });
+  }
 }
 
+function anyEliminated(){ return Object.values(STANDINGS).some(s=>s.out); }
 function playerTotals(){
   const cfg = readCfg();
   return PLAYERS.map(p=>{
@@ -605,7 +621,9 @@ function renderTeams(){
   PLAYERS.forEach(p=>{
     const card=document.createElement("div"); card.className="teamcard";
     const total=p.teams.reduce((a,t)=>a+(STANDINGS[t]?STANDINGS[t].pts:0),0);
-    let html=`<div class="row" style="justify-content:space-between"><span class="name">${p.name}</span><span class="ptsbig">${total} pts</span></div>`;
+    const aliveN=p.teams.filter(t=>STANDINGS[t] && !STANDINGS[t].out).length;
+    const aliveTag = anyEliminated()? `<span class="small muted" style="margin-right:10px">${aliveN}/9 alive</span>`:'';
+    let html=`<div class="row" style="justify-content:space-between"><span class="name">${p.name}</span><span style="display:flex;align-items:center">${aliveTag}<span class="ptsbig">${total} pts</span></span></div>`;
     // sort this player's teams like a live league table: points, then goal difference, then goals for
     const ranked=[...p.teams].sort((x,y)=>{
       const sx=STANDINGS[x]||{}, sy=STANDINGS[y]||{};
@@ -624,7 +642,9 @@ function renderTeams(){
         stat=`<span class="muted small">${s.seen?'yet to play':'—'}</span><span class="tpts">0</span>`;
       }
       const liveDot = s.live? `<span class="livedot" title="Playing now${s.elapsed?` — ${s.elapsed}'`:''}">🔴 ${s.elapsed?s.elapsed+"'":"LIVE"}</span>`:'';
-      html+=`<div class="teamline"><span class="tname"><span class="trank">${idx+1}</span>${t}${liveDot}</span><span class="tstat">${stat}</span></div>`;
+      const out = s.out && !s.live;
+      const outBadge = out? `<span class="outbadge" title="Knocked out — no matches left">OUT</span>`:'';
+      html+=`<div class="teamline${out?' isout':''}"><span class="tname"><span class="trank">${idx+1}</span>${t}${liveDot}</span><span class="tstat">${outBadge}${stat}</span></div>`;
     });
     card.innerHTML=html; grid.appendChild(card);
   });
