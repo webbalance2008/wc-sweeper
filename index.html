@@ -77,7 +77,11 @@
   .wdl .w{color:var(--accent)} .wdl .d{color:var(--muted)} .wdl .l{color:var(--red)}
   .gd{color:var(--muted);min-width:40px;text-align:right;font-variant-numeric:tabular-nums}
   .tpts{min-width:30px;text-align:center;font-weight:700;color:var(--gold);background:rgba(245,197,66,.12);border:1px solid rgba(245,197,66,.25);border-radius:6px;padding:2px 0}
-  .fx{display:flex;justify-content:space-between;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);font-size:14px}
+  .fx{display:flex;justify-content:space-between;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);font-size:14px;cursor:pointer}
+  .fx:hover{background:rgba(255,255,255,.03)}
+  .fx.open{border-bottom:none}
+  .fxchev{color:var(--muted);font-size:11px;flex:0 0 auto;width:14px;text-align:center;margin-left:4px}
+  .fxdetail{padding:4px 8px 12px 12px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
   .fx .score{font-weight:700;min-width:54px;text-align:center}
   .fx .when{color:var(--muted);font-size:12px;min-width:96px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -776,7 +780,8 @@ function renderFixtures(which){
     arr=arr.filter(f=>{ const s=f.fixture?.status?.short; return !FINISHED.has(s) && !INPLAY.has(s); }).sort((a,b)=> new Date(a.fixture.date)-new Date(b.fixture.date)).slice(0,40);
   }
   if(!arr.length){ list.innerHTML='<div class="muted">'+(fxOwner==="all"?'Nothing to show yet.':'No '+(currentFx==="recent"?'results':'upcoming matches')+' for '+fxOwner+'’s teams yet.')+'</div>'; return; }
-  arr.forEach(f=>{
+  list.innerHTML = arr.map(f=>{
+    const id=String(f.fixture.id);
     const d=new Date(f.fixture.date);
     const when = currentFx==="recent" ? d.toLocaleDateString() : d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
     const stat=f.fixture.status.short;
@@ -785,13 +790,43 @@ function renderFixtures(which){
     const scoreCell = `${sc}${tagText?`<div style="font-size:10px;color:var(--muted);font-weight:400">${tagText}</div>`:''}`;
     const win = stat==="PEN" ? (f.teams.home.winner===true?"home":f.teams.away.winner===true?"away":"") : "";
     const ownH=ownTag(f.teams.home.name), ownA=ownTag(f.teams.away.name);
-    const div=document.createElement("div"); div.className="fx";
-    div.innerHTML=`<span class="when">${when}<div style="font-size:10px;color:var(--accent)">${shortRound(f.league?.round)}</div></span>
+    const open=expandedFx.has(id);
+    const row=`<div class="fx${open?' open':''}" onclick="toggleFixtureDetail('${id}')">
+      <span class="when">${when}<div style="font-size:10px;color:var(--accent)">${shortRound(f.league?.round)}</div></span>
       <span style="flex:1;text-align:right${win==="home"?";font-weight:700":""}">${flag(f.teams.home.name)}${f.teams.home.name}${ownH}${win==="home"?" ✓":""}</span>
       <span class="score">${scoreCell}</span>
-      <span style="flex:1${win==="away"?";font-weight:700":""}">${ownA}${flag(f.teams.away.name)}${f.teams.away.name}${win==="away"?" ✓":""}</span>`;
-    list.appendChild(div);
-  });
+      <span style="flex:1${win==="away"?";font-weight:700":""}">${ownA}${flag(f.teams.away.name)}${f.teams.away.name}${win==="away"?" ✓":""}</span>
+      <span class="fxchev">${open?"▾":"▸"}</span></div>`;
+    const detail = open? `<div class="fxdetail">${fixtureDetailHTML(f)}</div>` : "";
+    return `<div class="fxitem">${row}${detail}</div>`;
+  }).join("");
+}
+let expandedFx=new Set();
+function fixtureDetailHTML(f){
+  const id=String(f.fixture.id);
+  if(!FINISHED.has(f.fixture?.status?.short)){
+    const d=new Date(f.fixture.date);
+    const v=f.fixture?.venue?.name ? ` · ${f.fixture.venue.name}${f.fixture.venue.city?", "+f.fixture.venue.city:""}` : "";
+    return `<div class="muted small">Kicks off ${d.toLocaleString()}${v}</div>`;
+  }
+  if(!EVENTS[id]) return `<div class="muted small">Loading match detail…</div>`;
+  const evs=matchEvents(EVENTS[id]);
+  if(!evs.length) return `<div class="muted small">No goals or cards recorded.</div>`;
+  return `<div class="liveevents" style="margin-top:0;border-top:none;padding-top:0">`+evs.map(e=>
+    `<div class="lev"><span class="levmin">${e.min}${e.ex?"+"+e.ex:""}'</span><span class="levicon">${e.icon}</span><span class="levwho">${e.player}${e.extra}<span class="levteam"> · ${e.team}</span></span></div>`
+  ).join("")+`</div>`;
+}
+async function toggleFixtureDetail(id){
+  id=String(id);
+  if(expandedFx.has(id)){ expandedFx.delete(id); renderFixtures(); return; }
+  expandedFx.add(id); renderFixtures();
+  // fetch events on demand for finished matches not already loaded (edge-cached 1h, no _m)
+  const f=FIXTURES.find(x=>String(x.fixture.id)===id);
+  if(f && FINISHED.has(f.fixture?.status?.short) && !EVENTS[id]){
+    try{ EVENTS[id]=await apiGet(`/fixtures/events?fixture=${id}`); }
+    catch(e){ EVENTS[id]=EVENTS[id]||[]; }
+    if(expandedFx.has(id)) renderFixtures();
+  }
 }
 function ownTag(name){ const c=canonical(name); return c? ` <span class="owner-chip">(${OWNER[c]})</span>`:""; }
 function flag(name){ const c=canonical(name); const url=LOGOS[name]||(c&&LOGOS[c])||""; return url? `<img class="flag" src="${url}" alt="" loading="lazy">`:""; }
