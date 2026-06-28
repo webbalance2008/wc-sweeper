@@ -31,6 +31,12 @@
   .livebadge{display:inline-block;font-size:11px;font-weight:700;color:var(--red);white-space:nowrap;animation:livepulse 1.4s ease-in-out infinite}
   @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.45}}
   .tname .livedot{color:var(--red);font-size:9px;margin-left:5px;animation:livepulse 1.4s ease-in-out infinite}
+  .livetab[data-tab]{animation:livepulse 1.4s ease-in-out infinite}
+  .livecard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:rgba(25,195,125,.06)}
+  .livescore{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+  .livescore .lteam{flex:1;font-weight:600;font-size:16px}
+  .livescore .lteam.away{text-align:right}
+  .livescore .lsc{font-size:28px;font-weight:800;color:var(--gold);white-space:nowrap;letter-spacing:1px}
   .teamline.isout .tname{opacity:.5;text-decoration:line-through}
   .outbadge{display:inline-block;font-size:9px;font-weight:700;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;text-decoration:none}
   button:disabled{opacity:.5;cursor:not-allowed}
@@ -134,11 +140,22 @@
 
   <div class="tabs" id="tabs">
     <div class="tab active" data-tab="leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</div>
+    <div class="tab livetab" data-tab="live" id="liveTab" onclick="showTab('live')" style="display:none">🔴 Live</div>
     <div class="tab" data-tab="teams" onclick="showTab('teams')">👥 Players &amp; teams</div>
     <div class="tab" data-tab="fixtures" onclick="showTab('fixtures')">📅 Results &amp; fixtures</div>
     <div class="tab" data-tab="highlights" onclick="showTab('highlights')">🎬 Highlights</div>
     <div class="tab" data-tab="tiebreak" onclick="showTab('tiebreak')">🎯 Tiebreakers</div>
     <div class="tab" data-tab="setup" onclick="showTab('setup')">⚙️ Setup</div>
+  </div>
+
+  <!-- LIVE NOW -->
+  <div class="panel tabpanel hidden" id="tab-live">
+    <div class="row" style="margin-bottom:14px">
+      <h2 style="margin:0">🔴 Live now</h2>
+      <span class="small muted" id="liveUpdated" style="margin-left:auto"></span>
+      <button onclick="loadData(true)">↻ Refresh</button>
+    </div>
+    <div id="liveList"></div>
   </div>
 
   <!-- LEADERBOARD -->
@@ -592,9 +609,9 @@ function renderUpdated(){
   else if(Date.now() < GO_LIVE) txt='live results begin 11 Jun 2026';
   else if(LAST_LOADED) txt=(anyLive()?'🔴 live · ':'')+'updated '+new Date(LAST_LOADED).toLocaleTimeString()+(anyLive()?' · auto':'');
   else txt='not loaded yet — tap Refresh';
-  ["lbUpdated","fxUpdated"].forEach(id=>{ const el=$(id); if(el) el.textContent=txt; });
+  ["lbUpdated","fxUpdated","liveUpdated"].forEach(id=>{ const el=$(id); if(el) el.textContent=txt; });
 }
-function renderAll(){ renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderHighlights(); renderActuals(); renderDiag(); renderPredTable(); updateTestButtons(); renderUpdated(); }
+function renderAll(){ renderLive(); renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderHighlights(); renderActuals(); renderDiag(); renderPredTable(); updateTestButtons(); renderUpdated(); }
 
 function renderLeaderboard(){
   const rows = playerTotals();
@@ -665,6 +682,49 @@ function shortRound(r){
   if(/final/i.test(r)) return "Final";
   return r;
 }
+function liveStatusLabel(short, elapsed){
+  const e = elapsed? elapsed+"'" : "";
+  switch(short){
+    case "1H": return (e?e+" · ":"")+"1st half";
+    case "HT": return "Half-time";
+    case "2H": return (e?e+" · ":"")+"2nd half";
+    case "ET": return (e?e+" · ":"")+"extra time";
+    case "BT": return "extra-time break";
+    case "P":  return "penalty shootout";
+    case "LIVE": return e? e+" · live" : "live";
+    default:   return short;
+  }
+}
+function renderLive(){
+  const live=FIXTURES.filter(f=>INPLAY.has(f.fixture?.status?.short))
+    .sort((a,b)=>(b.fixture.status.elapsed||0)-(a.fixture.status.elapsed||0));
+  const tabBtn=$("liveTab");
+  if(tabBtn) tabBtn.style.display = live.length? "" : "none";
+  const box=$("liveList");
+  if(!live.length){
+    // nothing live — if the user is sitting on the Live tab, bounce them to the leaderboard
+    const panel=$("tab-live");
+    if(panel && !panel.classList.contains("hidden")) showTab("leaderboard");
+    if(box) box.innerHTML="";
+    return;
+  }
+  if(!box) return;
+  box.innerHTML = live.map(f=>{
+    const st=f.fixture.status, lbl=liveStatusLabel(st.short, st.elapsed);
+    const h=f.teams.home, a=f.teams.away;
+    return `<div class="livecard">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <span class="small" style="color:var(--accent)">${shortRound(f.league?.round)}</span>
+        <span class="livebadge">🔴 ${lbl}</span>
+      </div>
+      <div class="livescore">
+        <span class="lteam">${h.name}${ownTag(h.name)}</span>
+        <span class="lsc">${f.goals.home??0}–${f.goals.away??0}</span>
+        <span class="lteam away">${a.name}${ownTag(a.name)}</span>
+      </div>
+    </div>`;
+  }).join("");
+}
 function renderFixtures(which){
   currentFx=which||currentFx;
   $("fxRecent").className="tab"+(currentFx==="recent"?" active":"");
@@ -677,7 +737,8 @@ function renderFixtures(which){
   if(currentFx==="recent"){
     arr=arr.filter(f=>FINISHED.has(f.fixture?.status?.short)).sort((a,b)=> new Date(b.fixture.date)-new Date(a.fixture.date)).slice(0,40);
   }else{
-    arr=arr.filter(f=>!FINISHED.has(f.fixture?.status?.short)).sort((a,b)=> new Date(a.fixture.date)-new Date(b.fixture.date)).slice(0,40);
+    // upcoming = not started only — in-progress matches live on the 🔴 Live tab
+    arr=arr.filter(f=>{ const s=f.fixture?.status?.short; return !FINISHED.has(s) && !INPLAY.has(s); }).sort((a,b)=> new Date(a.fixture.date)-new Date(b.fixture.date)).slice(0,40);
   }
   if(!arr.length){ list.innerHTML='<div class="muted">'+(fxOwner==="all"?'Nothing to show yet.':'No '+(currentFx==="recent"?'results':'upcoming matches')+' for '+fxOwner+'’s teams yet.')+'</div>'; return; }
   arr.forEach(f=>{
