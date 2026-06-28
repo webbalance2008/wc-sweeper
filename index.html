@@ -43,6 +43,8 @@
   .lev .levicon{font-size:12px}
   .lev .levwho{flex:1}
   .lev .levteam{color:var(--muted)}
+  .flag{height:14px;width:auto;vertical-align:-2px;margin-right:5px;border-radius:2px;object-fit:contain}
+  .livescore .flag{height:18px;vertical-align:-3px;margin-right:6px}
   .teamline.isout .tname{opacity:.5;text-decoration:line-through}
   .outbadge{display:inline-block;font-size:9px;font-weight:700;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;text-decoration:none}
   button:disabled{opacity:.5;cursor:not-allowed}
@@ -513,6 +515,7 @@ const FINISHED = new Set(["FT","AET","PEN"]);
 const INPLAY = new Set(["1H","HT","2H","ET","BT","P","LIVE"]);   // match currently being played
 
 let UNOWNED = {};   // api team name -> true, for teams in the tournament that nobody drew
+const LOGOS = {};   // team name (raw + canonical) -> flag/crest URL from API-Football
 function computeStandings(){
   STANDINGS = {};
   UNOWNED = {};
@@ -525,7 +528,9 @@ function computeStandings(){
     const isKO = /round of|quarter|semi|final|knockout|1\/|play|3rd/i.test(round) && !/group/i.test(round);
     const homeC = canonical(fx.teams?.home?.name);
     const awayC = canonical(fx.teams?.away?.name);
-    [["home",homeC,fx.teams?.home?.name],["away",awayC,fx.teams?.away?.name]].forEach(([side,c,nm])=>{
+    [["home",homeC,fx.teams?.home],["away",awayC,fx.teams?.away]].forEach(([side,c,team])=>{
+      const nm=team?.name;
+      if(team?.logo){ LOGOS[nm]=team.logo; if(c) LOGOS[c]=team.logo; }   // map name (raw + canonical) -> flag
       if(c&&STANDINGS[c]) STANDINGS[c].seen=true;
       else if(nm) UNOWNED[nm]=true;
     });
@@ -667,7 +672,7 @@ function renderTeams(){
       const liveDot = s.live? `<span class="livedot" title="Playing now${s.elapsed?` — ${s.elapsed}'`:''}">🔴 ${s.elapsed?s.elapsed+"'":"LIVE"}</span>`:'';
       const out = s.out && !s.live;
       const outBadge = out? `<span class="outbadge" title="Knocked out — no matches left">OUT</span>`:'';
-      html+=`<div class="teamline${out?' isout':''}"><span class="tname"><span class="trank">${idx+1}</span>${t}${liveDot}</span><span class="tstat">${outBadge}${stat}</span></div>`;
+      html+=`<div class="teamline${out?' isout':''}"><span class="tname"><span class="trank">${idx+1}</span>${flag(t)}${t}${liveDot}</span><span class="tstat">${outBadge}${stat}</span></div>`;
     });
     card.innerHTML=html; grid.appendChild(card);
   });
@@ -747,9 +752,9 @@ function renderLive(){
         <span class="livebadge">🔴 ${lbl}</span>
       </div>
       <div class="livescore">
-        <span class="lteam">${h.name}${ownTag(h.name)}</span>
+        <span class="lteam">${flag(h.name)}${h.name}${ownTag(h.name)}</span>
         <span class="lsc">${f.goals.home??0}–${f.goals.away??0}</span>
-        <span class="lteam away">${a.name}${ownTag(a.name)}</span>
+        <span class="lteam away">${flag(a.name)}${a.name}${ownTag(a.name)}</span>
       </div>
       ${timeline}
     </div>`;
@@ -782,13 +787,14 @@ function renderFixtures(which){
     const ownH=ownTag(f.teams.home.name), ownA=ownTag(f.teams.away.name);
     const div=document.createElement("div"); div.className="fx";
     div.innerHTML=`<span class="when">${when}<div style="font-size:10px;color:var(--accent)">${shortRound(f.league?.round)}</div></span>
-      <span style="flex:1;text-align:right${win==="home"?";font-weight:700":""}">${f.teams.home.name}${ownH}${win==="home"?" ✓":""}</span>
+      <span style="flex:1;text-align:right${win==="home"?";font-weight:700":""}">${flag(f.teams.home.name)}${f.teams.home.name}${ownH}${win==="home"?" ✓":""}</span>
       <span class="score">${scoreCell}</span>
-      <span style="flex:1${win==="away"?";font-weight:700":""}">${ownA}${f.teams.away.name}${win==="away"?" ✓":""}</span>`;
+      <span style="flex:1${win==="away"?";font-weight:700":""}">${ownA}${flag(f.teams.away.name)}${f.teams.away.name}${win==="away"?" ✓":""}</span>`;
     list.appendChild(div);
   });
 }
 function ownTag(name){ const c=canonical(name); return c? ` <span class="owner-chip">(${OWNER[c]})</span>`:""; }
+function flag(name){ const c=canonical(name); const url=LOGOS[name]||(c&&LOGOS[c])||""; return url? `<img class="flag" src="${url}" alt="" loading="lazy">`:""; }
 
 let HL_FIN=[];
 async function playSampleHighlight(){
