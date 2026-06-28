@@ -1084,6 +1084,9 @@ async function tallyCards(){
     const needs=f=>{ const id=String(f.fixture.id), s=f.fixture?.status?.short, c=cache[id]; return INPLAY.has(s)||!c||c.st!==s||c.stale; };
     const pending=fin.filter(needs).length;
     let done=0;
+    const RECENT_MS=5*3600*1000;   // window in which a STALE finished-match read might still be incomplete
+    const recompute=()=>{ let og=0,yel=0,red=0,have=0; ids.forEach(id=>{ const c=cache[id]; if(c){ og+=c.og; yel+=c.yel; red+=c.red; have++; } }); if(have){ ACT.og=og; ACT.yel=yel; ACT.red=red; setCardActuals(); } return {og,yel,red}; };
+    recompute();   // show whatever's already cached immediately, then climb as we fetch
     if(st && pending) st.textContent=`Updating card totals… 0/${pending}`;
     for(const f of fin){
       if(!needs(f)) continue;      // already read while in this status — reuse the cached count
@@ -1096,19 +1099,21 @@ async function tallyCards(){
           if(type==="goal" && detail.includes("own")) og++;
           if(type==="card" && detail.includes("yellow") && !detail.includes("second")) yel++;
           if(type==="card" && (detail.includes("red")||detail.includes("second yellow"))) red++; });
-        // mark stale-sourced reads so we keep re-fetching until a fresh copy confirms the final count
-        cache[String(f.fixture.id)]={og,yel,red,st:s,stale:(LAST_CACHE==="STALE")};
+        // A STALE serve is only suspect for live or just-finished matches (live-era events may be incomplete).
+        // For long-finished matches the shared stale copy IS the final events — accept it and stop re-reading.
+        const ts=(f.fixture?.timestamp?f.fixture.timestamp*1000:Date.parse(f.fixture?.date||""))||0;
+        const suspect=(LAST_CACHE==="STALE") && (live || (Date.now()-ts < RECENT_MS));
+        cache[String(f.fixture.id)]={og,yel,red,st:s,stale:suspect};
         EVENTS[String(f.fixture.id)]=ev;   // keep full event detail (scorers, cards) for the Live tab
-        done++; if(st) st.textContent=`Updating card totals… ${done}/${pending}`;
+        writeEvCache(cache);          // persist after EVERY match so a reload resumes instead of restarting
+        done++; recompute();          // totals climb as we go, instead of showing — until the very end
+        if(st) st.textContent=`Updating card totals… ${done}/${pending}`;
         if(LAST_CACHE!=="HIT") await sleep(1200);   // pace only real upstream calls; cached reads are free
       }catch(e){ /* keep any previous cached count; serve-stale usually prevents reaching here */ }
     }
     writeEvCache(cache);
-    let og=0,yel=0,red=0,have=0;
-    ids.forEach(id=>{ const c=cache[id]; if(c){ og+=c.og; yel+=c.yel; red+=c.red; have++; } });
-    if(have){ ACT.og=og; ACT.yel=yel; ACT.red=red; }
-    setCardActuals();
-    if(st){ const prov=liveN?` <span class="small">🔴 ${liveN} live — refreshes automatically.</span>`:''; st.innerHTML=`<span class="ok">Card totals: own goals ${og}, yellows ${yel}, reds ${red}.</span>${prov}`; }
+    const ft=recompute();
+    if(st){ const prov=liveN?` <span class="small">🔴 ${liveN} live — refreshes automatically.</span>`:''; st.innerHTML=`<span class="ok">Card totals: own goals ${ft.og}, yellows ${ft.yel}, reds ${ft.red}.</span>${prov}`; }
     renderCloseness();
     renderLive();   // live cards now have scorer/card detail to show
   } finally { _tallying=false; }
