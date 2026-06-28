@@ -82,6 +82,12 @@
   .fx.open{border-bottom:none}
   .fxchev{color:var(--muted);font-size:11px;flex:0 0 auto;width:14px;text-align:center;margin-left:4px}
   .fxdetail{padding:4px 8px 12px 12px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .formleg{display:flex;align-items:center;gap:6px;padding:7px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)}
+  .formleg:last-child{border-bottom:none}
+  .formleg.dim{opacity:.4}
+  .formleg .swatch{width:14px;height:4px;border-radius:2px;flex:0 0 auto}
+  .formleg .formteam{font-weight:600}
+  .formleg .formrec{margin-left:auto;color:var(--muted);font-size:11px;white-space:nowrap}
   .fx .score{font-weight:700;min-width:54px;text-align:center}
   .fx .when{color:var(--muted);font-size:12px;min-width:96px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -154,6 +160,7 @@
     <div class="tab active" data-tab="leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</div>
     <div class="tab livetab" data-tab="live" id="liveTab" onclick="showTab('live')" style="display:none">🔴 Live</div>
     <div class="tab" data-tab="teams" onclick="showTab('teams')">👥 Players &amp; teams</div>
+    <div class="tab" data-tab="form" onclick="showTab('form')">📈 Form</div>
     <div class="tab" data-tab="fixtures" onclick="showTab('fixtures')">📅 Results &amp; fixtures</div>
     <div class="tab" data-tab="highlights" onclick="showTab('highlights')">🎬 Highlights</div>
     <div class="tab" data-tab="tiebreak" onclick="showTab('tiebreak')">🎯 Tiebreakers</div>
@@ -168,6 +175,18 @@
       <button onclick="loadData(true)">↻ Refresh</button>
     </div>
     <div id="liveList"></div>
+  </div>
+
+  <!-- FORM -->
+  <div class="panel tabpanel hidden" id="tab-form">
+    <div class="row" style="margin-bottom:14px">
+      <h2 style="margin:0">📈 Form</h2>
+      <span class="small muted" id="formUpdated" style="margin-left:auto"></span>
+      <button onclick="loadData(true)">↻ Refresh</button>
+    </div>
+    <div class="legend" style="margin-bottom:10px">Top 5 teams by <b>form score = points + goal difference</b> — big wins and clean sheets push a team up, heavy defeats pull it down. Each line tracks a team match-by-match through the group stage and knockouts. Tap a team to highlight its line.</div>
+    <div id="formChart"></div>
+    <div id="formLegend" style="margin-top:10px"></div>
   </div>
 
   <!-- LEADERBOARD -->
@@ -624,9 +643,9 @@ function renderUpdated(){
   else if(Date.now() < GO_LIVE) txt='live results begin 11 Jun 2026';
   else if(LAST_LOADED) txt=(anyLive()?'🔴 live · ':'')+'updated '+new Date(LAST_LOADED).toLocaleTimeString()+(anyLive()?' · auto':'');
   else txt='not loaded yet — tap Refresh';
-  ["lbUpdated","fxUpdated","liveUpdated"].forEach(id=>{ const el=$(id); if(el) el.textContent=txt; });
+  ["lbUpdated","fxUpdated","liveUpdated","formUpdated"].forEach(id=>{ const el=$(id); if(el) el.textContent=txt; });
 }
-function renderAll(){ renderLive(); renderLeaderboard(); renderTeams(); renderFixtures(currentFx); renderHighlights(); renderActuals(); renderDiag(); renderPredTable(); updateTestButtons(); renderUpdated(); }
+function renderAll(){ renderLive(); renderLeaderboard(); renderForm(); renderTeams(); renderFixtures(currentFx); renderHighlights(); renderActuals(); renderDiag(); renderPredTable(); updateTestButtons(); renderUpdated(); }
 
 function renderLeaderboard(){
   const rows = playerTotals();
@@ -696,6 +715,68 @@ function shortRound(r){
   if(/3rd|third/i.test(r)) return "3rd place";
   if(/final/i.test(r)) return "Final";
   return r;
+}
+/* ---------- Form (top-5 performance line chart) ---------- */
+const FORM_COLORS=["#f5c542","#4aa8ff","#ff6fae","#9b7bff","#ff9f43"];
+let FORM_TOP=[], FORM_FOCUS=null;
+function setFormFocus(i){ const n=FORM_TOP[i]&&FORM_TOP[i].name; FORM_FOCUS=(FORM_FOCUS===n?null:n); renderForm(); }
+function buildFormData(){
+  const cfg=readCfg();
+  const played=FIXTURES.filter(f=>{const s=f.fixture?.status?.short; return FINISHED.has(s)||INPLAY.has(s);})
+    .sort((a,b)=> new Date(a.fixture.date)-new Date(b.fixture.date) || ((a.fixture.id>b.fixture.id)?1:-1));
+  const T={};
+  played.forEach(f=>{
+    const stat=f.fixture.status.short, isPen=stat==="PEN";
+    const gh=f.goals?.home??0, ga=f.goals?.away??0;
+    [[f.teams.home,gh,ga],[f.teams.away,ga,gh]].forEach(([team,gf,gaa])=>{
+      const name=team&&team.name; if(!name) return;
+      const t=T[name]||(T[name]={name,pts:0,gf:0,ga:0,w:0,d:0,l:0,seq:[]});
+      let res; if(isPen) res=team.winner===true?"W":"L"; else if(gf>gaa)res="W"; else if(gf===gaa)res="D"; else res="L";
+      t.pts += res==="W"?cfg.winPts : res==="D"?cfg.drawPts : 0;
+      t.gf+=gf; t.ga+=gaa; if(res==="W")t.w++; else if(res==="D")t.d++; else t.l++;
+      t.seq.push({idx:t.seq.length+1, score:t.pts+(t.gf-t.ga), round:f.league?.round||""});
+    });
+  });
+  return Object.values(T).map(t=>({...t, score:t.pts+(t.gf-t.ga)}))
+    .sort((a,b)=> b.score-a.score || b.pts-a.pts || (b.gf-b.ga)-(a.gf-a.ga) || a.name.localeCompare(b.name))
+    .slice(0,5);
+}
+function renderForm(){
+  const box=$("formChart"); if(!box) return;
+  const legend=$("formLegend");
+  FORM_TOP=buildFormData();
+  if(!FORM_TOP.length || !FORM_TOP.some(t=>t.seq.length)){
+    box.innerHTML='<div class="muted" style="padding:20px 4px">No matches played yet — the form chart appears once games are under way.</div>';
+    if(legend) legend.innerHTML=""; return;
+  }
+  if(FORM_FOCUS && !FORM_TOP.some(t=>t.name===FORM_FOCUS)) FORM_FOCUS=null;
+  const maxMatches=Math.max(...FORM_TOP.map(t=>t.seq.length));
+  const allV=FORM_TOP.flatMap(t=>t.seq.map(s=>s.score));
+  let yMax=Math.max(...allV,1), yMin=Math.min(...allV,0);
+  const range=Math.max(1,yMax-yMin), step=Math.max(1,Math.ceil(range/4));
+  yMax=Math.ceil(yMax/step)*step; yMin=Math.floor(yMin/step)*step;
+  const W=340,H=250,L=24,Rm=12,Tp=12,B=30, pw=W-L-Rm, ph=H-Tp-B;
+  const xs=i=> maxMatches<=1 ? L+pw/2 : L+(i-1)/(maxMatches-1)*pw;
+  const ys=v=> Tp+(1-(v-yMin)/(yMax-yMin))*ph;
+  const roundAt={}; FORM_TOP.forEach(t=>t.seq.forEach(s=>{ if(!roundAt[s.idx]) roundAt[s.idx]=shortRound(s.round); }));
+  let g="";
+  for(let v=yMin;v<=yMax;v+=step){ const y=ys(v); g+=`<line x1="${L}" y1="${y.toFixed(1)}" x2="${W-Rm}" y2="${y.toFixed(1)}" stroke="var(--line)" stroke-width="1"/><text x="${L-3}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--muted)">${v}</text>`; }
+  let xlab=""; for(let i=1;i<=maxMatches;i++){ const anc=i===1?"start":i===maxMatches?"end":"middle"; const lbl=(roundAt[i]||(""+i)).replace(/^Group /,""); xlab+=`<text x="${xs(i).toFixed(1)}" y="${H-15}" text-anchor="${anc}" font-size="9" fill="var(--muted)">${lbl}</text>`; }
+  let kdiv=""; if(maxMatches>3){ const xd=(xs(3)+xs(4))/2; kdiv=`<line x1="${xd.toFixed(1)}" y1="${Tp}" x2="${xd.toFixed(1)}" y2="${Tp+ph}" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/><text x="${(xd+3).toFixed(1)}" y="${Tp+9}" font-size="8" fill="var(--accent)">knockouts →</text>`; }
+  let lines="";
+  FORM_TOP.forEach((t,i)=>{
+    const col=FORM_COLORS[i%FORM_COLORS.length], focused=FORM_FOCUS===t.name, dim=FORM_FOCUS&&!focused, op=dim?0.16:1;
+    const pl=t.seq.map(s=>`${xs(s.idx).toFixed(1)},${ys(s.score).toFixed(1)}`).join(" ");
+    lines+=`<polyline points="${pl}" fill="none" stroke="${col}" stroke-width="${focused?3:2}" stroke-linejoin="round" stroke-linecap="round" opacity="${op}"/>`;
+    lines+=t.seq.map(s=>`<circle cx="${xs(s.idx).toFixed(1)}" cy="${ys(s.score).toFixed(1)}" r="${focused?3.4:2.4}" fill="${col}" opacity="${op}"/>`).join("");
+  });
+  box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${g}${kdiv}${lines}${xlab}</svg>`;
+  if(legend){
+    legend.innerHTML=FORM_TOP.map((t,i)=>{
+      const col=FORM_COLORS[i%FORM_COLORS.length], dim=FORM_FOCUS&&FORM_FOCUS!==t.name;
+      return `<div class="formleg${dim?' dim':''}" onclick="setFormFocus(${i})"><span class="swatch" style="background:${col}"></span>${flag(t.name)}<span class="formteam">${t.name}</span>${ownTag(t.name)}<span class="formrec">${t.score} · ${t.pts}pt · ${t.w}-${t.d}-${t.l} · ${t.gf}-${t.ga}</span></div>`;
+    }).join("");
+  }
 }
 function liveStatusLabel(short, elapsed){
   const e = elapsed? elapsed+"'" : "";
