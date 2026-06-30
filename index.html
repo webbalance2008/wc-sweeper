@@ -750,12 +750,13 @@ function renderTeams(){
     const aliveN=p.teams.filter(t=>STANDINGS[t] && !STANDINGS[t].out).length;
     const aliveTag = anyEliminated()? `<span class="small muted" style="margin-right:10px">${aliveN}/9 alive</span>`:'';
     let html=`<div class="row" style="justify-content:space-between"><span class="name">${p.name}</span><span style="display:flex;align-items:center">${aliveTag}<span class="ptsbig">${total} pts</span></span></div>`;
-    // sort this player's teams like a live league table: points, then goal difference, then goals for
+    // rank by how well they're doing: still-alive teams first, then by points, goal diff, goals for
     const ranked=[...p.teams].sort((x,y)=>{
       const sx=STANDINGS[x]||{}, sy=STANDINGS[y]||{};
+      const ox=sx.out?1:0, oy=sy.out?1:0;
       const px=sx.pts||0, py=sy.pts||0;
       const gdx=(sx.gf||0)-(sx.ga||0), gdy=(sy.gf||0)-(sy.ga||0);
-      return py-px || gdy-gdx || (sy.gf||0)-(sx.gf||0) || x.localeCompare(y);
+      return ox-oy || py-px || gdy-gdx || (sy.gf||0)-(sx.gf||0) || x.localeCompare(y);
     });
     ranked.forEach((t,idx)=>{
       const s=STANDINGS[t]||{p:0,w:0,d:0,l:0,gf:0,ga:0,pts:0,out:false,seen:true};
