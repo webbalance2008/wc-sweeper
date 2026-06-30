@@ -20,7 +20,7 @@
     background-attachment:fixed;color:var(--text);min-height:100vh;}
   a{color:var(--blue)}
   header{padding:24px 18px 6px;text-align:center}
-  .wc-logo{height:62px;width:auto;display:block;margin:0 auto 10px;filter:drop-shadow(0 8px 20px rgba(0,0,0,.5))}
+  .wc-logo{height:104px;width:auto;display:block;margin:0 auto 10px;filter:drop-shadow(0 8px 22px rgba(0,0,0,.5))}
   h1{margin:0;font-size:23px;letter-spacing:.2px;font-weight:800}
   h1 .yr{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
   .sub{color:var(--muted);font-size:13px;margin-top:6px}
@@ -40,10 +40,11 @@
   .tname .livedot{color:var(--red);font-size:9px;margin-left:5px;animation:livepulse 1.4s ease-in-out infinite}
   .livetab[data-tab]{animation:livepulse 1.4s ease-in-out infinite}
   .livecard{border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:12px;background:linear-gradient(180deg,rgba(91,91,255,.12),rgba(255,255,255,.02))}
-  .livescore{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
-  .livescore .lteam{flex:1;font-weight:600;font-size:16px;display:flex;align-items:center;gap:0}
-  .livescore .lteam.away{text-align:right;justify-content:flex-end}
-  .livescore .lsc{font-size:30px;font-weight:800;color:#fff;white-space:nowrap;letter-spacing:1px}
+  .livescore{display:flex;align-items:center;gap:10px;margin-top:12px}
+  .livescore .lteam{flex:1 1 0;min-width:0;font-weight:600;font-size:15px;display:flex;align-items:center;gap:0}
+  .livescore .lteam.away{justify-content:flex-end;text-align:right}
+  .livescore .lteam .tn{min-width:0;overflow-wrap:anywhere}
+  .livescore .lsc{flex:0 0 auto;font-size:28px;font-weight:800;color:#fff;white-space:nowrap;letter-spacing:.5px}
   .liveevents{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
   .lev{display:flex;align-items:baseline;gap:8px;font-size:13px}
   .lev .levmin{color:var(--muted);min-width:34px;font-variant-numeric:tabular-nums}
@@ -152,7 +153,13 @@
     .sub{font-size:12px}
     .grid2{grid-template-columns:1fr}
     .predcards{grid-template-columns:1fr}
-    .tab{padding:7px 12px;font-size:13px}
+    /* swipeable single-row tab strip, stuck to the top */
+    .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+      position:sticky;top:0;z-index:30;margin:0 -8px;padding:8px 8px;
+      background:rgba(9,16,45,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .tabs::-webkit-scrollbar{display:none}
+    .tab{flex:0 0 auto;white-space:nowrap;padding:8px 14px;font-size:13px}
+    .wc-logo{height:84px}
   }
 </style>
 </head>
@@ -168,10 +175,10 @@
   <div class="tabs" id="tabs">
     <div class="tab active" data-tab="leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</div>
     <div class="tab livetab" data-tab="live" id="liveTab" onclick="showTab('live')" style="display:none">🔴 Live</div>
-    <div class="tab" data-tab="teams" onclick="showTab('teams')">👥 Players &amp; teams</div>
-    <div class="tab" data-tab="form" onclick="showTab('form')">📈 Form</div>
     <div class="tab" data-tab="fixtures" onclick="showTab('fixtures')">📅 Results &amp; fixtures</div>
     <div class="tab" data-tab="highlights" onclick="showTab('highlights')">🎬 Highlights</div>
+    <div class="tab" data-tab="teams" onclick="showTab('teams')">👥 Players &amp; teams</div>
+    <div class="tab" data-tab="form" onclick="showTab('form')">📈 Form</div>
     <div class="tab" data-tab="tiebreak" onclick="showTab('tiebreak')">🎯 Tiebreakers</div>
     <div class="tab" data-tab="setup" onclick="showTab('setup')">⚙️ Setup</div>
   </div>
@@ -871,9 +878,9 @@ function renderLive(){
         <span class="livebadge">🔴 ${lbl}</span>
       </div>
       <div class="livescore">
-        <span class="lteam">${flag(h.name)}${h.name}${ownTag(h.name)}</span>
+        <span class="lteam">${flag(h.name)}<span class="tn">${h.name}${ownTag(h.name)}</span></span>
         <span class="lsc">${f.goals.home??0}–${f.goals.away??0}</span>
-        <span class="lteam away">${flag(a.name)}${a.name}${ownTag(a.name)}</span>
+        <span class="lteam away"><span class="tn">${a.name}${ownTag(a.name)}</span>${flag(a.name)}</span>
       </div>
       ${timeline}
     </div>`;
@@ -1193,6 +1200,8 @@ function showTab(t){
   document.querySelectorAll(".tabpanel").forEach(p=>p.classList.add("hidden"));
   $("tab-"+t).classList.remove("hidden");
   document.querySelectorAll("#tabs .tab").forEach(el=>el.classList.toggle("active", el.dataset.tab===t));
+  const cur=document.querySelector('#tabs .tab[data-tab="'+t+'"]');   // keep the active tab in view on the mobile strip
+  if(cur && cur.scrollIntoView) try{ cur.scrollIntoView({inline:"center", block:"nearest", behavior:"smooth"}); }catch(e){}
 }
 
 /* ---------- init ---------- */
