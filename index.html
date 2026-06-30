@@ -207,14 +207,14 @@
 <div class="wrap">
 
   <div class="tabs" id="tabs">
-    <div class="tab active" data-tab="leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</div>
+    <div class="tab active" data-tab="leaderboard" onclick="showTab('leaderboard')">Leaderboard</div>
     <div class="tab livetab" data-tab="live" id="liveTab" onclick="showTab('live')" style="display:none">🔴 Live</div>
-    <div class="tab" data-tab="fixtures" onclick="showTab('fixtures')">📅 Results &amp; fixtures</div>
-    <div class="tab" data-tab="highlights" onclick="showTab('highlights')">🎬 Highlights</div>
-    <div class="tab" data-tab="teams" onclick="showTab('teams')">👥 Players &amp; teams</div>
-    <div class="tab" data-tab="form" onclick="showTab('form')">📈 Form</div>
-    <div class="tab" data-tab="tiebreak" onclick="showTab('tiebreak')">🎯 Tiebreakers</div>
-    <div class="tab" data-tab="setup" onclick="showTab('setup')">⚙️ Setup</div>
+    <div class="tab" data-tab="fixtures" onclick="showTab('fixtures')">Results &amp; fixtures</div>
+    <div class="tab" data-tab="highlights" onclick="showTab('highlights')">Highlights</div>
+    <div class="tab" data-tab="teams" onclick="showTab('teams')">Players &amp; teams</div>
+    <div class="tab" data-tab="form" onclick="showTab('form')">Form</div>
+    <div class="tab" data-tab="tiebreak" onclick="showTab('tiebreak')">Tiebreakers</div>
+    <div class="tab" data-tab="setup" onclick="showTab('setup')">Setup</div>
   </div>
 
   <!-- LIVE NOW -->
@@ -230,7 +230,7 @@
   <!-- FORM -->
   <div class="panel tabpanel hidden" id="tab-form">
     <div class="row" style="margin-bottom:14px">
-      <h2 style="margin:0">📈 Form</h2>
+      <h2 style="margin:0">Form</h2>
       <span class="small muted" id="formUpdated" style="margin-left:auto"></span>
       <button onclick="loadData(true)">↻ Refresh</button>
     </div>
@@ -242,7 +242,7 @@
   <!-- LEADERBOARD -->
   <div class="panel tabpanel" id="tab-leaderboard">
     <div class="row" style="margin-bottom:14px">
-      <h2 style="margin:0">🏆 Leaderboard</h2>
+      <h2 style="margin:0">Leaderboard</h2>
       <span class="small muted" id="lbUpdated" style="margin-left:auto"></span>
       <button onclick="loadData(true)">↻ Refresh</button>
     </div>
@@ -262,7 +262,7 @@
 
   <!-- TEAMS -->
   <div class="panel tabpanel hidden" id="tab-teams">
-    <h2>👥 Players &amp; teams</h2>
+    <h2>Players &amp; teams</h2>
     <div class="legend" style="margin-bottom:10px">Each team shows <b style="color:var(--accent)">W</b> <b style="color:var(--muted)">D</b> <b style="color:var(--red)">L</b> · goals for–against · <b style="color:var(--gold)">points</b></div>
     <div class="grid2" id="teamsGrid"></div>
   </div>
@@ -270,7 +270,7 @@
   <!-- FIXTURES -->
   <div class="panel tabpanel hidden" id="tab-fixtures">
     <div class="row" style="margin-bottom:14px">
-      <h2 style="margin:0">📅 Results &amp; fixtures</h2>
+      <h2 style="margin:0">Results &amp; fixtures</h2>
       <span class="small muted" id="fxUpdated" style="margin-left:auto"></span>
       <button onclick="loadData(true)">↻ Refresh</button>
     </div>
@@ -293,7 +293,7 @@
 
   <!-- HIGHLIGHTS -->
   <div class="panel tabpanel hidden" id="tab-highlights">
-    <h2>🎬 Highlights</h2>
+    <h2>Highlights</h2>
     <div class="legend">Every completed match, newest first. Tap a card to play the match highlights right here in the page.</div>
     <div class="row" style="margin:10px 0">
       <button class="secondary" onclick="playSampleHighlight()">▶ Preview a sample highlight</button>
@@ -304,7 +304,7 @@
 
   <!-- TIEBREAKERS -->
   <div class="panel tabpanel hidden" id="tab-tiebreak">
-    <h2>🎯 Tiebreaker predictions</h2>
+    <h2>Tiebreaker predictions</h2>
     <div class="legend">Each player fills in their own card and taps Save. <b>Once saved, a prediction is locked in</b> and can't be changed (shared across everyone). Everything also hard-locks at kickoff.</div>
     <div id="lockBanner" class="legend" style="margin-top:6px"></div>
     <div class="predcards" id="predCards"></div>
@@ -328,7 +328,7 @@
 
   <!-- SETUP (own tab) -->
   <div class="panel tabpanel hidden" id="tab-setup">
-    <h2>⚙️ Setup</h2>
+    <h2>Setup</h2>
     <div id="keyRow">
       <div class="row">
         <input type="password" id="apiKey" placeholder="Paste your api-sports.io API key" style="flex:1;min-width:220px">
