@@ -20,9 +20,10 @@
     background-attachment:fixed;color:var(--text);min-height:100vh;}
   a{color:var(--blue)}
   header{padding:24px 18px 6px;text-align:center}
-  .wc-logo{height:104px;width:auto;display:block;margin:0 auto 10px;filter:drop-shadow(0 8px 22px rgba(0,0,0,.5))}
-  h1{margin:0;font-size:23px;letter-spacing:.2px;font-weight:800}
+  .wc-logo{height:150px;width:auto;display:block;margin:0 auto 10px;filter:drop-shadow(0 10px 26px rgba(0,0,0,.5))}
+  h1{margin:0;font-size:23px;letter-spacing:.2px;font-weight:800;line-height:1.15}
   h1 .yr{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  h1 .sweep{display:block}
   .sub{color:var(--muted);font-size:13px;margin-top:6px}
   .wrap{max-width:1080px;margin:0 auto;padding:12px 14px 60px}
   .panel{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:18px;padding:16px;margin:14px 0;
@@ -76,9 +77,21 @@
   .pill.loss{background:rgba(255,91,98,.15);color:var(--red)}
   .teamcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;background:var(--panel2)}
   .teamcard .name{font-weight:600}
-  .teamline{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:13px;border-top:1px dashed var(--line)}
-  .teamline:first-of-type{border-top:none}
+  .teamitem{border-top:1px dashed var(--line)}
+  .teamitem:first-of-type{border-top:none}
+  .teamline{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 2px;font-size:13px;cursor:pointer;border-radius:6px}
+  .teamline:hover{background:rgba(255,255,255,.03)}
+  .tchev{color:var(--muted);font-size:10px;margin-left:2px}
   .tname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tmlist{padding:4px 6px 10px 24px;display:flex;flex-direction:column;gap:6px}
+  .tmrow{display:flex;align-items:center;gap:8px;font-size:12px}
+  .tmround{color:var(--blue);min-width:42px;font-size:10px;font-weight:700;text-transform:uppercase}
+  .tmopp{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+  .tmopp .flag{height:14px;width:14px;margin-right:5px}
+  .tmsc{font-variant-numeric:tabular-nums;font-weight:700;min-width:40px;text-align:right}
+  .tmsc .pn{font-size:9px;color:var(--muted);font-weight:500}
+  .tmres{width:18px;height:18px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex:0 0 auto}
+  .tmres.w{background:var(--win)} .tmres.d{background:#5a6b8c} .tmres.l{background:var(--red)}
   .trank{display:inline-block;min-width:16px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
   .tstat{display:flex;align-items:center;gap:10px;flex:none;font-size:12px}
   .wdl{display:inline-flex;gap:6px;font-variant-numeric:tabular-nums}
@@ -180,15 +193,14 @@
       background:rgba(9,16,45,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
     .tabs::-webkit-scrollbar{display:none}
     .tab{flex:0 0 auto;white-space:nowrap;padding:8px 14px;font-size:13px}
-    .wc-logo{height:84px}
+    .wc-logo{height:128px}
   }
 </style>
 </head>
 <body>
 <header>
   <img src="wc-trophy.png" class="wc-logo" alt="FIFA World Cup 2026">
-  <h1>World Cup <span class="yr">2026</span> Sweepstake</h1>
-  <div class="sub">USA · Canada · Mexico — 5 players, 9 teams each · live from API-Football</div>
+  <h1>World Cup <span class="yr">2026</span><span class="sweep">Sweepstake</span></h1>
 </header>
 
 <div class="wrap">
@@ -757,10 +769,40 @@ function renderTeams(){
       const liveDot = s.live? `<span class="livedot" title="Playing now${s.elapsed?` — ${s.elapsed}'`:''}">🔴 ${s.elapsed?s.elapsed+"'":"LIVE"}</span>`:'';
       const out = s.out && !s.live;
       const outBadge = out? `<span class="outbadge" title="Knocked out — no matches left">OUT</span>`:'';
-      html+=`<div class="teamline${out?' isout':''}"><span class="tname"><span class="trank">${idx+1}</span>${flag(t)}${t}${liveDot}</span><span class="tstat">${outBadge}${stat}</span></div>`;
+      const open=expandedTeams.has(t);
+      const line=`<div class="teamline${out?' isout':''}" data-t="${attrEsc(t)}" onclick="toggleTeamDetail(this.dataset.t)"><span class="tname"><span class="trank">${idx+1}</span>${flag(t)}${t}${liveDot}</span><span class="tstat">${outBadge}${stat}<span class="tchev">${open?'▾':'▸'}</span></span></div>`;
+      html+=`<div class="teamitem">${line}${open?teamDetailHTML(t):''}</div>`;
     });
     card.innerHTML=html; grid.appendChild(card);
   });
+}
+function attrEsc(s){ return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+const expandedTeams=new Set();
+function toggleTeamDetail(name){ if(expandedTeams.has(name)) expandedTeams.delete(name); else expandedTeams.add(name); renderTeams(); }
+function teamMatches(t){
+  const out=[];
+  FIXTURES.forEach(f=>{
+    const s=f.fixture?.status?.short; if(!(FINISHED.has(s)||INPLAY.has(s))) return;
+    let side=null;
+    if(canonical(f.teams?.home?.name)===t) side="home";
+    else if(canonical(f.teams?.away?.name)===t) side="away";
+    else return;
+    const gh=f.goals?.home??0, ga=f.goals?.away??0, gf=side==="home"?gh:ga, gaa=side==="home"?ga:gh;
+    const oppName=(side==="home"?f.teams.away:f.teams.home)?.name||"";
+    let res;
+    if(s==="PEN"){ res=((side==="home"?f.teams.home.winner:f.teams.away.winner)===true)?"W":"L"; }
+    else if(gf>gaa) res="W"; else if(gf===gaa) res="D"; else res="L";
+    out.push({date:Date.parse(f.fixture?.date||"")||0, round:f.league?.round||"", oppName, gf, gaa, res, pen:s==="PEN", live:INPLAY.has(s)});
+  });
+  return out.sort((a,b)=>a.date-b.date);
+}
+function teamDetailHTML(t){
+  const ms=teamMatches(t);
+  if(!ms.length) return '<div class="tmlist"><span class="muted small">No matches played yet.</span></div>';
+  return '<div class="tmlist">'+ms.map(m=>{
+    const rc=m.res==="W"?"w":m.res==="D"?"d":"l";
+    return `<div class="tmrow"><span class="tmround">${shortRound(m.round)}</span><span class="tmopp">${flag(m.oppName)}v ${m.oppName}${m.live?' <span class="livebadge">🔴</span>':''}</span><span class="tmsc">${m.gf}–${m.gaa}${m.pen?' <span class="pn">pen</span>':''}</span><span class="tmres ${rc}">${m.res}</span></div>`;
+  }).join('')+'</div>';
 }
 
 let currentFx="recent";
