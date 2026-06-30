@@ -580,17 +580,41 @@ function computeStandings(){
     apply(awayC, ga, gh, fx.teams?.away?.winner===true);
   });
 
-  // Knock-out / elimination: a team is "alive" only if it still appears in a fixture that
-  // isn't finished (an upcoming or in-progress match). This captures group-stage non-qualifiers
-  // and knockout losers alike — once the next round is drawn, eliminated teams have no fixture
-  // left. Applied only once the tournament is under way, so nothing shows out before kickoff.
+  // Knock-out / elimination. A team is alive if it still has a match to play OR it WON its most
+  // recent knockout tie (it has advanced, even before the next round's fixture is drawn — the API
+  // fills the bracket match-by-match). Out if it lost its last knockout, or finished the group
+  // stage without making the knockouts. Applied only once the tournament is under way.
   const anyFinished = FIXTURES.some(f=>FINISHED.has(f.fixture?.status?.short));
   if(anyFinished){
-    const hasFuture={};
-    FIXTURES.forEach(f=>{ if(!FINISHED.has(f.fixture?.status?.short)){
-      [f.teams?.home?.name, f.teams?.away?.name].forEach(nm=>{ const c=canonical(nm); if(c&&STANDINGS[c]) hasFuture[c]=true; });
-    }});
-    Object.keys(STANDINGS).forEach(t=>{ const s=STANDINGS[t]; if(!s.live && !hasFuture[t]) s.out=true; });
+    const info={};   // canonical team -> {hasUpcoming, hasKO, played, last:{date,isKO,won}}
+    FIXTURES.forEach(f=>{
+      const s=f.fixture?.status?.short, round=f.league?.round||"";
+      const isKO=/round of|quarter|semi|final|knockout|1\/|play|3rd/i.test(round) && !/group/i.test(round);
+      const date=Date.parse(f.fixture?.date||"")||0, fin=FINISHED.has(s), live=INPLAY.has(s);
+      [["home",f.teams?.home],["away",f.teams?.away]].forEach(([side,team])=>{
+        const c=canonical(team?.name); if(!c||!STANDINGS[c]) return;
+        const o=info[c]||(info[c]={hasUpcoming:false,hasKO:false,played:false,last:null});
+        if(isKO) o.hasKO=true;
+        if(live || (!fin && (s==="NS"||s==="TBD"))) o.hasUpcoming=true;   // still a match to come
+        if(fin){
+          o.played=true;
+          if(!o.last || date>=o.last.date){
+            const gh=f.goals?.home??0, ga=f.goals?.away??0, my=side==="home"?gh:ga, opp=side==="home"?ga:gh;
+            const won = team?.winner===true || (team?.winner!==false && my>opp);   // PEN/AET use winner flag
+            o.last={date, isKO, won};
+          }
+        }
+      });
+    });
+    Object.keys(STANDINGS).forEach(t=>{
+      const s=STANDINGS[t], o=info[t];
+      if(s.live){ s.out=false; return; }
+      if(!o){ s.out=true; return; }                       // not in the tournament at all
+      if(o.hasUpcoming){ s.out=false; return; }            // a match still to play → alive
+      if(!o.played){ s.out=true; return; }
+      if(o.last && o.last.isKO){ s.out=!o.last.won; return; }  // gap before next round: alive iff it won its last KO
+      s.out=true;                                          // group stage over, no knockout ahead → didn't qualify
+    });
   }
 }
 
