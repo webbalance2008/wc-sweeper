@@ -589,7 +589,8 @@ function computeStandings(){
     const info={};   // canonical team -> {hasUpcoming, hasKO, played, last:{date,isKO,won}}
     FIXTURES.forEach(f=>{
       const s=f.fixture?.status?.short, round=f.league?.round||"";
-      const isKO=/round of|quarter|semi|final|knockout|1\/|play|3rd/i.test(round) && !/group/i.test(round);
+      if(/3rd|third place/i.test(round)) return;   // 3rd-place playoff: SF losers are already out, ignore it here
+      const isKO=/round of|quarter|semi|final|knockout|1\//i.test(round) && !/group/i.test(round);
       const date=Date.parse(f.fixture?.date||"")||0, fin=FINISHED.has(s), live=INPLAY.has(s);
       [["home",f.teams?.home],["away",f.teams?.away]].forEach(([side,team])=>{
         const c=canonical(team?.name); if(!c||!STANDINGS[c]) return;
