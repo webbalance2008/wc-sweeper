@@ -219,21 +219,21 @@
 
   <!-- LIVE NOW -->
   <div class="panel tabpanel hidden" id="tab-live">
-    <div class="row" style="margin-bottom:14px">
+    <div class="row" style="margin-bottom:6px;flex-wrap:nowrap;align-items:center">
       <h2 style="margin:0">🔴 Live now</h2>
-      <span class="small muted" id="liveUpdated" style="margin-left:auto"></span>
-      <button onclick="loadData(true)">↻ Refresh</button>
+      <button onclick="loadData(true)" style="margin-left:auto;flex:0 0 auto">↻ Refresh</button>
     </div>
+    <div class="small muted" id="liveUpdated" style="margin-bottom:12px"></div>
     <div id="liveList"></div>
   </div>
 
   <!-- FORM -->
   <div class="panel tabpanel hidden" id="tab-form">
-    <div class="row" style="margin-bottom:14px">
+    <div class="row" style="margin-bottom:6px;flex-wrap:nowrap;align-items:center">
       <h2 style="margin:0">Form</h2>
-      <span class="small muted" id="formUpdated" style="margin-left:auto"></span>
-      <button onclick="loadData(true)">↻ Refresh</button>
+      <button onclick="loadData(true)" style="margin-left:auto;flex:0 0 auto">↻ Refresh</button>
     </div>
+    <div class="small muted" id="formUpdated" style="margin-bottom:12px"></div>
     <div class="legend" style="margin-bottom:10px">Top 5 teams by <b>form score = points + goal difference</b> — big wins and clean sheets push a team up, heavy defeats pull it down. Each line tracks a team match-by-match through the group stage and knockouts. Tap a team to highlight its line.</div>
     <div id="formChart"></div>
     <div id="formLegend" style="margin-top:10px"></div>
@@ -241,11 +241,11 @@
 
   <!-- LEADERBOARD -->
   <div class="panel tabpanel" id="tab-leaderboard">
-    <div class="row" style="margin-bottom:14px">
+    <div class="row" style="margin-bottom:6px;flex-wrap:nowrap;align-items:center">
       <h2 style="margin:0">Leaderboard</h2>
-      <span class="small muted" id="lbUpdated" style="margin-left:auto"></span>
-      <button onclick="loadData(true)">↻ Refresh</button>
+      <button onclick="loadData(true)" style="margin-left:auto;flex:0 0 auto">↻ Refresh</button>
     </div>
+    <div class="small muted" id="lbUpdated" style="margin-bottom:12px"></div>
     <div class="tablewrap">
     <table id="lbTable">
       <thead><tr>
@@ -269,11 +269,11 @@
 
   <!-- FIXTURES -->
   <div class="panel tabpanel hidden" id="tab-fixtures">
-    <div class="row" style="margin-bottom:14px">
+    <div class="row" style="margin-bottom:6px;flex-wrap:nowrap;align-items:center">
       <h2 style="margin:0">Results &amp; fixtures</h2>
-      <span class="small muted" id="fxUpdated" style="margin-left:auto"></span>
-      <button onclick="loadData(true)">↻ Refresh</button>
+      <button onclick="loadData(true)" style="margin-left:auto;flex:0 0 auto">↻ Refresh</button>
     </div>
+    <div class="small muted" id="fxUpdated" style="margin-bottom:12px"></div>
     <div class="row" style="margin-bottom:8px">
       <div class="tab active" id="fxRecent" onclick="renderFixtures('recent')">Recent results</div>
       <div class="tab" id="fxUpcoming" onclick="renderFixtures('upcoming')">Upcoming</div>
