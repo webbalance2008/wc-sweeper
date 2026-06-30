@@ -91,6 +91,27 @@
   .fx.open{border-bottom:none}
   .fxchev{color:var(--muted);font-size:11px;flex:0 0 auto;width:14px;text-align:center;margin-left:4px}
   .fxdetail{padding:4px 8px 12px 12px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  /* fixtures grouped into day/round containers, with centred scores */
+  .fxgroup{border:1px solid var(--line);border-radius:16px;margin:12px 0;overflow:hidden;background:rgba(255,255,255,.018)}
+  .fxghead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:9px 14px;background:rgba(255,255,255,.05);border-bottom:1px solid var(--line)}
+  .fxgdate{font-weight:700;font-size:13px}
+  .fxground{font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.6px}
+  .fxrow{display:flex;align-items:center;gap:5px;padding:11px 8px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13.5px}
+  .fxrow:last-child{border-bottom:none}
+  .fxrow.open{border-bottom:none}
+  .fxrow:hover{background:rgba(255,255,255,.03)}
+  .fxsp{flex:0 0 12px}
+  .fxchev{color:var(--muted);font-size:11px;flex:0 0 12px;text-align:center}
+  .fxteam{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:5px;font-size:13.5px}
+  .fxteam.away{justify-content:flex-end;text-align:right}
+  .fxteam .flag{margin:0;height:16px;width:16px}
+  .fxteam .nm{min-width:0;overflow-wrap:break-word;line-height:1.2}
+  .fxteam .nm .owner-chip{display:block;font-size:10px;line-height:1.25}
+  .fxteam.win .nm{font-weight:700}
+  .fxsc{flex:0 0 auto;min-width:44px;text-align:center;font-weight:800;font-size:15px;line-height:1.05}
+  .fxsc .pens{display:block;font-size:9px;color:var(--muted);font-weight:500;letter-spacing:.3px}
+  .fxsc .fxtime{font-weight:700;font-size:13px;color:var(--muted)}
+  .fxwin{color:var(--win);font-weight:700}
   .formleg{display:flex;align-items:center;gap:6px;padding:7px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--line)}
   .formleg:last-child{border-bottom:none}
   .formleg.dim{opacity:.4}
@@ -902,25 +923,34 @@ function renderFixtures(which){
     arr=arr.filter(f=>{ const s=f.fixture?.status?.short; return !FINISHED.has(s) && !INPLAY.has(s); }).sort((a,b)=> new Date(a.fixture.date)-new Date(b.fixture.date)).slice(0,40);
   }
   if(!arr.length){ list.innerHTML='<div class="muted">'+(fxOwner==="all"?'Nothing to show yet.':'No '+(currentFx==="recent"?'results':'upcoming matches')+' for '+fxOwner+'’s teams yet.')+'</div>'; return; }
-  list.innerHTML = arr.map(f=>{
-    const id=String(f.fixture.id);
-    const d=new Date(f.fixture.date);
-    const when = currentFx==="recent" ? d.toLocaleDateString() : d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-    const stat=f.fixture.status.short;
-    const sc = FINISHED.has(stat) ? `${f.goals.home}–${f.goals.away}` : stat;
-    const tagText = stat==="PEN" ? "pens" : stat==="AET" ? "a.e.t." : "";
-    const scoreCell = `${sc}${tagText?`<div style="font-size:10px;color:var(--muted);font-weight:400">${tagText}</div>`:''}`;
-    const win = stat==="PEN" ? (f.teams.home.winner===true?"home":f.teams.away.winner===true?"away":"") : "";
-    const ownH=ownTag(f.teams.home.name), ownA=ownTag(f.teams.away.name);
-    const open=expandedFx.has(id);
-    const row=`<div class="fx${open?' open':''}" onclick="toggleFixtureDetail('${id}')">
-      <span class="when">${when}<div style="font-size:10px;color:var(--accent)">${shortRound(f.league?.round)}</div></span>
-      <span style="flex:1;text-align:right${win==="home"?";font-weight:700":""}">${flag(f.teams.home.name)}${f.teams.home.name}${ownH}${win==="home"?" ✓":""}</span>
-      <span class="score">${scoreCell}</span>
-      <span style="flex:1${win==="away"?";font-weight:700":""}">${ownA}${flag(f.teams.away.name)}${f.teams.away.name}${win==="away"?" ✓":""}</span>
-      <span class="fxchev">${open?"▾":"▸"}</span></div>`;
-    const detail = open? `<div class="fxdetail">${fixtureDetailHTML(f)}</div>` : "";
-    return `<div class="fxitem">${row}${detail}</div>`;
+  // group into day + round containers (arr is already sorted, so groups stay in order)
+  const groups=[], gidx={};
+  arr.forEach(f=>{
+    const d=new Date(f.fixture.date), key=d.toISOString().slice(0,10)+"|"+(f.league?.round||"");
+    let g=gidx[key]; if(!g){ g=gidx[key]={d, round:f.league?.round||"", items:[]}; groups.push(g); }
+    g.items.push(f);
+  });
+  list.innerHTML = groups.map(g=>{
+    const head=`<div class="fxghead"><span class="fxgdate">${g.d.toLocaleDateString([], {weekday:'short', day:'numeric', month:'short', year:'numeric'})}</span><span class="fxground">${shortRound(g.round)}</span></div>`;
+    const rows=g.items.map(f=>{
+      const id=String(f.fixture.id), stat=f.fixture.status.short, fin=FINISHED.has(stat);
+      const h=f.teams.home, a=f.teams.away;
+      const win = stat==="PEN" ? (h.winner===true?"home":a.winner===true?"away":"")
+                : (fin && f.goals.home!==f.goals.away ? (f.goals.home>f.goals.away?"home":"away") : "");
+      const center = fin
+        ? `${f.goals.home}–${f.goals.away}${stat==="PEN"?'<span class="pens">pens</span>':stat==="AET"?'<span class="pens">a.e.t.</span>':''}`
+        : `<span class="fxtime">${new Date(f.fixture.date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>`;
+      const hw=win==="home"?' <span class="fxwin">✓</span>':'', aw=win==="away"?'<span class="fxwin">✓</span> ':'';
+      const open=expandedFx.has(id);
+      const row=`<div class="fxrow${open?' open':''}" onclick="toggleFixtureDetail('${id}')">
+        <span class="fxsp"></span>
+        <span class="fxteam home${win==="home"?" win":""}">${flag(h.name)}<span class="nm">${h.name}${hw}${ownTag(h.name)}</span></span>
+        <span class="fxsc">${center}</span>
+        <span class="fxteam away${win==="away"?" win":""}"><span class="nm">${aw}${a.name}${ownTag(a.name)}</span>${flag(a.name)}</span>
+        <span class="fxchev">${open?"▾":"▸"}</span></div>`;
+      return row + (open? `<div class="fxdetail">${fixtureDetailHTML(f)}</div>` : "");
+    }).join("");
+    return `<div class="fxgroup">${head}${rows}</div>`;
   }).join("");
 }
 let expandedFx=new Set();
