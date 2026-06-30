@@ -6,52 +6,60 @@
 <title>World Cup 2026 Sweepstake</title>
 <style>
   :root{
-    --bg:#0a1f14; --panel:#0f2a1c; --panel2:#13351f; --line:#1f4a30;
-    --text:#eaf3ec; --muted:#9bbfa6; --accent:#19c37d; --gold:#f5c542;
-    --red:#e5534b; --blue:#4aa3ff; --chip:#16402a;
+    --bg:#091233; --bg2:#0b1740; --panel:#0f1f4d; --panel2:#16285f; --line:#27376f;
+    --text:#eef2fb; --muted:#94a4cc; --accent:#3d6dff; --accent2:#9a4bff;
+    --grad:linear-gradient(120deg,#9a3bff,#5b5bff 52%,#2e84ff);
+    --win:#2fd27a; --gold:#ffc83d; --red:#ff5b62; --blue:#4aa3ff; --chip:#16265c;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    background:linear-gradient(160deg,#08160e,#0a1f14 40%,#0c2418);color:var(--text);min-height:100vh;}
-  a{color:var(--accent)}
-  header{padding:22px 18px 10px;text-align:center}
-  h1{margin:0;font-size:24px;letter-spacing:.3px}
-  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+    background:
+      radial-gradient(1100px 560px at 50% -240px, rgba(124,58,237,.30), transparent 60%),
+      radial-gradient(900px 480px at 108% -40px, rgba(46,132,255,.22), transparent 55%),
+      linear-gradient(180deg,#0a1340,#070d28 62%);
+    background-attachment:fixed;color:var(--text);min-height:100vh;}
+  a{color:var(--blue)}
+  header{padding:24px 18px 6px;text-align:center}
+  .wc-logo{height:62px;width:auto;display:block;margin:0 auto 10px;filter:drop-shadow(0 8px 20px rgba(0,0,0,.5))}
+  h1{margin:0;font-size:23px;letter-spacing:.2px;font-weight:800}
+  h1 .yr{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:13px;margin-top:6px}
   .wrap{max-width:1080px;margin:0 auto;padding:12px 14px 60px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin:14px 0;
-    box-shadow:0 4px 18px rgba(0,0,0,.25)}
+  .panel{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:18px;padding:16px;margin:14px 0;
+    box-shadow:0 10px 34px rgba(4,8,30,.45)}
   .panel h2{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:8px}
   .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
   input,button,select{font:inherit}
-  input[type=text],input[type=number],input[type=password]{background:#0a2014;border:1px solid var(--line);
-    color:var(--text);border-radius:8px;padding:8px 10px;outline:none}
+  input[type=text],input[type=number],input[type=password]{background:rgba(255,255,255,.05);border:1px solid var(--line);
+    color:var(--text);border-radius:9px;padding:8px 10px;outline:none}
   input:focus{border-color:var(--accent)}
-  button{background:var(--accent);color:#04150c;border:none;border-radius:9px;padding:9px 16px;font-weight:600;cursor:pointer}
-  button.secondary{background:transparent;border:1px solid var(--line);color:var(--text)}
+  button{background:var(--grad);color:#fff;border:none;border-radius:11px;padding:9px 17px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(80,80,255,.32)}
+  button.secondary{background:rgba(255,255,255,.06);border:1px solid var(--line);color:var(--text);box-shadow:none}
   .livebadge{display:inline-block;font-size:11px;font-weight:700;color:var(--red);white-space:nowrap;animation:livepulse 1.4s ease-in-out infinite}
   @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.45}}
   .tname .livedot{color:var(--red);font-size:9px;margin-left:5px;animation:livepulse 1.4s ease-in-out infinite}
   .livetab[data-tab]{animation:livepulse 1.4s ease-in-out infinite}
-  .livecard{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:rgba(25,195,125,.06)}
+  .livecard{border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:12px;background:linear-gradient(180deg,rgba(91,91,255,.12),rgba(255,255,255,.02))}
   .livescore{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
-  .livescore .lteam{flex:1;font-weight:600;font-size:16px}
-  .livescore .lteam.away{text-align:right}
-  .livescore .lsc{font-size:28px;font-weight:800;color:var(--gold);white-space:nowrap;letter-spacing:1px}
+  .livescore .lteam{flex:1;font-weight:600;font-size:16px;display:flex;align-items:center;gap:0}
+  .livescore .lteam.away{text-align:right;justify-content:flex-end}
+  .livescore .lsc{font-size:30px;font-weight:800;color:#fff;white-space:nowrap;letter-spacing:1px}
   .liveevents{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
   .lev{display:flex;align-items:baseline;gap:8px;font-size:13px}
   .lev .levmin{color:var(--muted);min-width:34px;font-variant-numeric:tabular-nums}
   .lev .levicon{font-size:12px}
   .lev .levwho{flex:1}
   .lev .levteam{color:var(--muted)}
-  .flag{height:14px;width:auto;vertical-align:-2px;margin-right:5px;border-radius:2px;object-fit:contain}
-  .livescore .flag{height:18px;vertical-align:-3px;margin-right:6px}
+  .flag{height:18px;width:18px;border-radius:50%;object-fit:cover;vertical-align:-5px;margin-right:7px;background:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+  .livescore .flag{height:26px;width:26px;vertical-align:-7px;margin-right:8px}
   .teamline.isout .tname{opacity:.5;text-decoration:line-through}
   .outbadge{display:inline-block;font-size:9px;font-weight:700;color:var(--red);border:1px solid var(--red);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle;letter-spacing:.5px;text-decoration:none}
   button:disabled{opacity:.5;cursor:not-allowed}
   .muted{color:var(--muted)}
   .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
-  .tab{padding:8px 14px;border-radius:999px;background:var(--chip);border:1px solid var(--line);cursor:pointer;font-size:13px;color:var(--muted)}
-  .tab.active{background:var(--accent);color:#04150c;border-color:var(--accent);font-weight:600}
+  .tab{padding:8px 14px;border-radius:999px;background:var(--chip);border:1px solid var(--line);cursor:pointer;font-size:13px;color:var(--muted);transition:color .15s,background .15s}
+  .tab:hover{color:var(--text)}
+  .tab.active{background:var(--grad);color:#fff;border-color:transparent;font-weight:700;box-shadow:0 3px 14px rgba(80,80,255,.38)}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line)}
   th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
@@ -60,11 +68,11 @@
   .rank{font-weight:700;width:28px;text-align:center}
   .ptsbig{font-weight:800;font-size:16px;color:var(--gold)}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
-  .pill.alive{background:rgba(25,195,125,.15);color:var(--accent)}
-  .pill.out{background:rgba(229,83,75,.15);color:var(--red)}
-  .pill.win{background:rgba(25,195,125,.15);color:var(--accent)}
-  .pill.draw{background:rgba(245,197,66,.15);color:var(--gold)}
-  .pill.loss{background:rgba(229,83,75,.15);color:var(--red)}
+  .pill.alive{background:rgba(47,210,122,.15);color:var(--win)}
+  .pill.out{background:rgba(255,91,98,.15);color:var(--red)}
+  .pill.win{background:rgba(47,210,122,.15);color:var(--win)}
+  .pill.draw{background:rgba(255,200,61,.15);color:var(--gold)}
+  .pill.loss{background:rgba(255,91,98,.15);color:var(--red)}
   .teamcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;background:var(--panel2)}
   .teamcard .name{font-weight:600}
   .teamline{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 0;font-size:13px;border-top:1px dashed var(--line)}
@@ -74,7 +82,7 @@
   .tstat{display:flex;align-items:center;gap:10px;flex:none;font-size:12px}
   .wdl{display:inline-flex;gap:6px;font-variant-numeric:tabular-nums}
   .wdl b{font-weight:600;min-width:14px;text-align:center}
-  .wdl .w{color:var(--accent)} .wdl .d{color:var(--muted)} .wdl .l{color:var(--red)}
+  .wdl .w{color:var(--win)} .wdl .d{color:var(--muted)} .wdl .l{color:var(--red)}
   .gd{color:var(--muted);min-width:40px;text-align:right;font-variant-numeric:tabular-nums}
   .tpts{min-width:30px;text-align:center;font-weight:700;color:var(--gold);background:rgba(245,197,66,.12);border:1px solid rgba(245,197,66,.25);border-radius:6px;padding:2px 0}
   .fx{display:flex;justify-content:space-between;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);font-size:14px;cursor:pointer}
@@ -95,7 +103,7 @@
   .hidden{display:none}
   .status{font-size:13px;color:var(--muted);margin-top:8px;min-height:18px}
   .err{color:var(--red)}
-  .ok{color:var(--accent)}
+  .ok{color:var(--win)}
   .pred input{width:74px}
   .pred td{font-size:13px}
   .legend{font-size:12px;color:var(--muted);margin-top:8px}
@@ -150,8 +158,9 @@
 </head>
 <body>
 <header>
-  <h1>⚽ World Cup 2026 Sweepstake</h1>
-  <div class="sub">USA · Canada · Mexico — 5 players, 9 teams each · live results from API-Football</div>
+  <img src="wc-trophy.png" class="wc-logo" alt="FIFA World Cup 2026">
+  <h1>World Cup <span class="yr">2026</span> Sweepstake</h1>
+  <div class="sub">USA · Canada · Mexico — 5 players, 9 teams each · live from API-Football</div>
 </header>
 
 <div class="wrap">
