@@ -75,7 +75,7 @@
   .pill.win{background:rgba(47,210,122,.15);color:var(--win)}
   .pill.draw{background:rgba(255,200,61,.15);color:var(--gold)}
   .pill.loss{background:rgba(255,91,98,.15);color:var(--red)}
-  .teamcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;background:var(--panel2)}
+  .teamcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;background:var(--panel2);min-width:0;overflow:hidden}
   .teamcard .name{font-weight:600}
   .teamitem{border-top:1px dashed var(--line)}
   .teamitem:first-of-type{border-top:none}
@@ -92,12 +92,13 @@
   .tmsc .pn{font-size:9px;color:var(--muted);font-weight:500}
   .tmres{width:18px;height:18px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;flex:0 0 auto}
   .tmres.w{background:var(--win)} .tmres.d{background:#5a6b8c} .tmres.l{background:var(--red)}
-  .trank{display:inline-block;min-width:16px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
-  .tstat{display:flex;align-items:center;gap:10px;flex:none;font-size:12px}
-  .wdl{display:inline-flex;gap:6px;font-variant-numeric:tabular-nums}
-  .wdl b{font-weight:600;min-width:14px;text-align:center}
+  .trank{display:inline-block;min-width:14px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+  .teamline .tname .flag{height:16px;width:16px}
+  .tstat{display:flex;align-items:center;gap:7px;flex:none;font-size:12px}
+  .wdl{display:inline-flex;gap:5px;font-variant-numeric:tabular-nums}
+  .wdl b{font-weight:600;min-width:11px;text-align:center}
   .wdl .w{color:var(--win)} .wdl .d{color:var(--muted)} .wdl .l{color:var(--red)}
-  .gd{color:var(--muted);min-width:40px;text-align:right;font-variant-numeric:tabular-nums}
+  .gd{color:var(--muted);min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
   .tpts{min-width:30px;text-align:center;font-weight:700;color:var(--gold);background:rgba(245,197,66,.12);border:1px solid rgba(245,197,66,.25);border-radius:6px;padding:2px 0}
   .fx{display:flex;justify-content:space-between;align-items:center;padding:8px 6px;border-bottom:1px solid var(--line);font-size:14px;cursor:pointer}
   .fx:hover{background:rgba(255,255,255,.03)}
@@ -199,7 +200,7 @@
 </head>
 <body>
 <header>
-  <img src="wc-trophy.png" class="wc-logo" alt="FIFA World Cup 2026">
+  <img src="wc-trophy.png?v=2" class="wc-logo" alt="FIFA World Cup 2026">
   <h1>World Cup <span class="yr">2026</span><span class="sweep">Sweepstake</span></h1>
 </header>
 
