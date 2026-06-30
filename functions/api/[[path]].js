@@ -19,8 +19,12 @@
 const UPSTREAM = "https://v3.football.api-sports.io";
 
 // How long to reuse a cached upstream response, by endpoint.
-function ttlFor(path) {
-  if (path.startsWith("fixtures/events")) return 3600;     // events of a finished match never change
+function ttlFor(path, url) {
+  if (path.startsWith("fixtures/events")) {
+    // Live reads carry a per-minute _m bust; a finished match's events never change, so cache them
+    // hard (24h) — this is the app's heaviest call source, so it keeps the shared key's load low.
+    return url.searchParams.has("_m") ? 90 : 86400;
+  }
   if (path.startsWith("fixtures")) return 120;             // scores update during live play
   return 120;
 }
@@ -84,7 +88,7 @@ export async function onRequestGet(context) {
 
   // 3) Success — cache fresh + refresh the long-lived stale copy, then serve.
   if (ok) {
-    const ttl = ttlFor(path);
+    const ttl = ttlFor(path, url);
     const res = new Response(body, {
       status: 200,
       headers: { "content-type": "application/json", "cache-control": `public, max-age=${ttl}`, "x-proxy-cache": "MISS", ...quota },
