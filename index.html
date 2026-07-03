@@ -257,7 +257,7 @@
       <tbody id="lbBody"><tr><td colspan="10" class="muted">No data yet — refresh results.</td></tr></tbody>
     </table>
     </div>
-    <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. A penalty-shootout win counts as a full win (3). “Alive” = teams not yet knocked out. <b>Max</b> = the highest total still reachable — every alive team wins its remaining matches to the final, but where two of a player's own teams must meet, only one can go through.</div>
+    <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. A penalty-shootout win counts as a full win (3). “Alive” = teams not yet knocked out. <b>Max</b> = the highest total still reachable, walking the knockout bracket: alive teams keep winning, but only so many can survive each round (max 4 in the quarters, 2 in the semis, 1 in the final) and where two of a player's own teams meet, only one goes through.</div>
     <div class="legend" id="lbLiveNote" style="display:none"><span class="livebadge">🔴 LIVE</span> — a match is in progress. Those points are <b>provisional</b> from the current score and will change if the score does; they only lock when the match finishes.</div>
   </div>
 
@@ -675,27 +675,33 @@ const TOURNEY_MATCHES=8;   // most matches a team plays if it wins the cup: 3 gr
 function playerTotals(){
   const cfg = readCfg();
   return PLAYERS.map(p=>{
-    let pts=0,w=0,d=0,l=0,gf=0,played=0,alive=0,live=0,maxPts=0;
+    let pts=0,w=0,d=0,l=0,gf=0,played=0,alive=0,live=0;
     p.teams.forEach(t=>{
       const s=STANDINGS[t]; if(!s) return;
       pts+=s.pts; w+=s.w; d+=s.d; l+=s.l; gf+=s.gf; played+=s.p;
       if(!s.out) alive++;
       if(s.live) live++;
-      // current points + a win for every match this team could still play if it kept winning to the final
-      const remaining = s.out ? 0 : Math.max(0, TOURNEY_MATCHES - (s.p||0));
-      maxPts += s.pts + remaining*cfg.winPts;
     });
-    // realistic cap: when two of a player's own teams meet in a remaining (drawn/in-play) fixture,
-    // only one can go on — so drop the eliminated team's onward path. Later, undrawn rounds self-correct
-    // as the bracket fills in.
-    FIXTURES.forEach(f=>{
-      if(FINISHED.has(f.fixture?.status?.short)) return;
+    // Projected max = current points + the most future wins possible for this player's alive teams,
+    // walking the bracket round by round. Two hard limits keep it real:
+    //   1. a round only has so many matches, so at most that many of a player's teams can win it
+    //      (≤4 in the QF, ≤2 in the SF, ≤1 in the final) — a player with lots of teams can't run them all;
+    //   2. where two of the player's own teams are drawn against each other, only one goes through.
+    // Round index: 0=R32, 1=R16, 2=QF, 3=SF, 4=Final.
+    const fresh=[0,0,0,0,0], coll=[0,0,0,0,0], RM=[16,8,4,2,1];
+    p.teams.forEach(t=>{ const s=STANDINGS[t]; if(!s||s.out) return;
+      const idx=(s.p||0)-3;                     // group (3 games) done → next round from games played
+      if(idx>=0&&idx<=4) fresh[idx]++;
+    });
+    FIXTURES.forEach(f=>{ if(FINISHED.has(f.fixture?.status?.short)) return;   // known own-vs-own draws
       const hc=canonical(f.teams?.home?.name), ac=canonical(f.teams?.away?.name);
-      if(hc && ac && p.teams.indexOf(hc)>=0 && p.teams.indexOf(ac)>=0){
-        const pl=(STANDINGS[hc]&&STANDINGS[hc].p)||0;
-        maxPts -= Math.max(0, TOURNEY_MATCHES - pl)*cfg.winPts;
+      if(hc&&ac&&p.teams.indexOf(hc)>=0&&p.teams.indexOf(ac)>=0){
+        const idx=((STANDINGS[hc]&&STANDINGS[hc].p)||0)-3; if(idx>=0&&idx<=4) coll[idx]++;
       }
     });
+    let adv=0, futureWins=0;
+    for(let rr=0;rr<5;rr++){ const A=fresh[rr]+adv; const wins=Math.min(Math.max(0,A-coll[rr]),RM[rr]); futureWins+=wins; adv=wins; }
+    const maxPts = pts + futureWins*cfg.winPts;
     return {name:p.name,pts,maxPts,w,d,l,gf,played,alive,live,teams:p.teams};
   }).sort((a,b)=> b.pts-a.pts || b.gf-a.gf || b.w-a.w);
 }
