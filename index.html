@@ -257,7 +257,7 @@
       <tbody id="lbBody"><tr><td colspan="10" class="muted">No data yet — refresh results.</td></tr></tbody>
     </table>
     </div>
-    <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. A penalty-shootout win counts as a full win (3). “Alive” = teams not yet knocked out. <b>Max</b> = the highest total still reachable if every one of a player's alive teams won every remaining match all the way to the final.</div>
+    <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. A penalty-shootout win counts as a full win (3). “Alive” = teams not yet knocked out. <b>Max</b> = the highest total still reachable — every alive team wins its remaining matches to the final, but where two of a player's own teams must meet, only one can go through.</div>
     <div class="legend" id="lbLiveNote" style="display:none"><span class="livebadge">🔴 LIVE</span> — a match is in progress. Those points are <b>provisional</b> from the current score and will change if the score does; they only lock when the match finishes.</div>
   </div>
 
@@ -681,9 +681,20 @@ function playerTotals(){
       pts+=s.pts; w+=s.w; d+=s.d; l+=s.l; gf+=s.gf; played+=s.p;
       if(!s.out) alive++;
       if(s.live) live++;
-      // ceiling: this team's current points + a win for every match it could still play if it wins out
+      // current points + a win for every match this team could still play if it kept winning to the final
       const remaining = s.out ? 0 : Math.max(0, TOURNEY_MATCHES - (s.p||0));
       maxPts += s.pts + remaining*cfg.winPts;
+    });
+    // realistic cap: when two of a player's own teams meet in a remaining (drawn/in-play) fixture,
+    // only one can go on — so drop the eliminated team's onward path. Later, undrawn rounds self-correct
+    // as the bracket fills in.
+    FIXTURES.forEach(f=>{
+      if(FINISHED.has(f.fixture?.status?.short)) return;
+      const hc=canonical(f.teams?.home?.name), ac=canonical(f.teams?.away?.name);
+      if(hc && ac && p.teams.indexOf(hc)>=0 && p.teams.indexOf(ac)>=0){
+        const pl=(STANDINGS[hc]&&STANDINGS[hc].p)||0;
+        maxPts -= Math.max(0, TOURNEY_MATCHES - pl)*cfg.winPts;
+      }
     });
     return {name:p.name,pts,maxPts,w,d,l,gf,played,alive,live,teams:p.teams};
   }).sort((a,b)=> b.pts-a.pts || b.gf-a.gf || b.w-a.w);
