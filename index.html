@@ -69,6 +69,7 @@
   tr.leader td{background:rgba(245,197,66,.08)}
   .rank{font-weight:700;width:28px;text-align:center}
   .ptsbig{font-weight:800;font-size:16px;color:var(--gold)}
+  .maxpts{font-weight:600;color:var(--muted)}
   .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
   .pill.alive{background:rgba(47,210,122,.15);color:var(--win)}
   .pill.out{background:rgba(255,91,98,.15);color:var(--red)}
@@ -249,14 +250,14 @@
     <div class="tablewrap">
     <table id="lbTable">
       <thead><tr>
-        <th class="rank">#</th><th>Player</th><th class="num">Pts</th>
+        <th class="rank">#</th><th>Player</th><th class="num">Pts</th><th class="num">Max</th>
         <th class="num">P</th><th class="num">W</th><th class="num">D</th><th class="num">L</th>
         <th class="num">GF</th><th class="num">Alive</th>
       </tr></thead>
-      <tbody id="lbBody"><tr><td colspan="9" class="muted">No data yet — refresh results.</td></tr></tbody>
+      <tbody id="lbBody"><tr><td colspan="10" class="muted">No data yet — refresh results.</td></tr></tbody>
     </table>
     </div>
-    <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. A penalty-shootout win counts as a full win (3). “Alive” = teams not yet knocked out.</div>
+    <div class="legend">Points = each of a player's 9 teams earns <b id="lbWin">3</b> per win and <b id="lbDraw">1</b> per draw, across every tournament match. A penalty-shootout win counts as a full win (3). “Alive” = teams not yet knocked out. <b>Max</b> = the highest total still reachable if every one of a player's alive teams won every remaining match all the way to the final.</div>
     <div class="legend" id="lbLiveNote" style="display:none"><span class="livebadge">🔴 LIVE</span> — a match is in progress. Those points are <b>provisional</b> from the current score and will change if the score does; they only lock when the match finishes.</div>
   </div>
 
@@ -670,17 +671,21 @@ function computeStandings(){
 }
 
 function anyEliminated(){ return Object.values(STANDINGS).some(s=>s.out); }
+const TOURNEY_MATCHES=8;   // most matches a team plays if it wins the cup: 3 group + R32+R16+QF+SF+Final
 function playerTotals(){
   const cfg = readCfg();
   return PLAYERS.map(p=>{
-    let pts=0,w=0,d=0,l=0,gf=0,played=0,alive=0,live=0;
+    let pts=0,w=0,d=0,l=0,gf=0,played=0,alive=0,live=0,maxPts=0;
     p.teams.forEach(t=>{
       const s=STANDINGS[t]; if(!s) return;
       pts+=s.pts; w+=s.w; d+=s.d; l+=s.l; gf+=s.gf; played+=s.p;
       if(!s.out) alive++;
       if(s.live) live++;
+      // ceiling: this team's current points + a win for every match it could still play if it wins out
+      const remaining = s.out ? 0 : Math.max(0, TOURNEY_MATCHES - (s.p||0));
+      maxPts += s.pts + remaining*cfg.winPts;
     });
-    return {name:p.name,pts,w,d,l,gf,played,alive,live,teams:p.teams};
+    return {name:p.name,pts,maxPts,w,d,l,gf,played,alive,live,teams:p.teams};
   }).sort((a,b)=> b.pts-a.pts || b.gf-a.gf || b.w-a.w);
 }
 
@@ -734,6 +739,7 @@ function renderLeaderboard(){
     const liveBadge = r.live? ` <span class="livebadge" title="${r.live} match${r.live>1?'es':''} in progress — points are provisional">🔴 LIVE</span>`:'';
     tr.innerHTML=`<td class="rank">${i+1}</td><td>${r.name}${i===0&&r.pts>0?' 👑':''}${liveBadge}</td>
       <td class="num"><span class="ptsbig">${r.pts}</span></td>
+      <td class="num"><span class="maxpts">${r.maxPts}</span></td>
       <td class="num">${r.played}</td><td class="num">${r.w}</td><td class="num">${r.d}</td><td class="num">${r.l}</td>
       <td class="num">${r.gf}</td><td class="num">${r.alive}/9</td>`;
     tb.appendChild(tr);
